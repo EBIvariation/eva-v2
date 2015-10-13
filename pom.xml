@@ -8,10 +8,33 @@
     <artifactId>eva</artifactId>
     <version>0.1</version>
     <packaging>pom</packaging>
-    
-	<modules>
+
+    <properties>
+        <java.version>1.7</java.version>
+        <opencga.version>0.5.2</opencga.version>
+        <boot.version>1.2.6.RELEASE</boot.version>
+    </properties>
+
+    <modules>
         <module>eva-pipeline</module>
-<!--    		<module>eva-data-access</module> -->
+        <!-- <module>eva-data-access</module> -->
     </modules>
-    
+
+    <build>
+        <plugins>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-compiler-plugin</artifactId>
+                <version>3.2</version>
+                <configuration>
+                    <source>${java.version}</source>
+                    <target>${java.version}</target>
+                    <showDeprecation>true</showDeprecation>
+                    <showWarnings>true</showWarnings>
+                    <encoding>UTF-8</encoding>
+                </configuration>
+            </plugin>
+        </plugins>
+    </build>
+
 </project>

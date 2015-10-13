@@ -20,6 +20,10 @@ hs_err_pid*
 # NetBeans projects
 nb-configuration.xml
 
+# Intellij Idea project
+*.iml
+.idea
+
 # Others
 .DS_Store
 
