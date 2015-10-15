@@ -25,7 +25,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.context.annotation.PropertySource;
-import org.springframework.context.annotation.PropertySources;
+import org.springframework.context.support.PropertySourcesPlaceholderConfigurer;
 import org.springframework.core.env.Environment;
 
 /**
@@ -34,9 +34,7 @@ import org.springframework.core.env.Environment;
  */
 @Configuration
 @EnableBatchProcessing
-@PropertySources({
-    @PropertySource("classpath:job-test.properties")
-})
+@PropertySource("classpath:job-test.properties")
 public class SimplestConfig {
     
     public static final String jobName = "simpleJob";
@@ -46,6 +44,8 @@ public class SimplestConfig {
     @Autowired StepBuilderFactory stepBuilderFactory;
     
     @Autowired Environment env;
+    
+    @Autowired SimplestProperties properties;
 
     @Bean
     public Job simpleJob() {
@@ -64,12 +64,24 @@ public class SimplestConfig {
             @Override
             public RepeatStatus execute(StepContribution sc, ChunkContext cc) throws Exception {
                 System.out.println(env.getProperty("compressGenotypes"));
+                System.out.println(properties.compressGenotypes);
                 System.out.println("Step 1 done!!");
                 return RepeatStatus.FINISHED;
             }
         });
         
         return t.build();
+    }
+    
+    @Bean
+    public SimplestProperties simplestProperties(){
+        return new SimplestProperties();
+    }
+    
+    // To resolve ${} in @Value
+    @Bean
+    public static PropertySourcesPlaceholderConfigurer propertyConfigInDev() {
+        return new PropertySourcesPlaceholderConfigurer();
     }
     
 }

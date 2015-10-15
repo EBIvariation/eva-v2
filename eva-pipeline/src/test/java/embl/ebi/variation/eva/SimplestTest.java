@@ -33,10 +33,12 @@ public class SimplestTest {
         @Autowired Job job;
         @Autowired JobLauncher jobLauncher;
         @Autowired Environment env;
+        @Autowired SimplestProperties properties;
 	
 	@Test public void simpleTest() throws Exception {
             JobExecution execution = jobLauncher.run(job, new JobParameters());
             assertTrue(env.getProperty("compressGenotypes", Boolean.class));
+            assertTrue(properties.compressGenotypes);
             assertEquals(ExitStatus.COMPLETED, execution.getExitStatus());
 	}
 	
