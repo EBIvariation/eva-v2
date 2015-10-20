@@ -65,6 +65,7 @@ public class SimplestConfig {
             public RepeatStatus execute(StepContribution sc, ChunkContext cc) throws Exception {
                 System.out.println(env.getProperty("compressGenotypes"));
                 System.out.println(properties.compressGenotypes);
+                System.out.println("input = " + properties.input);
                 System.out.println("Step 1 done!!");
                 return RepeatStatus.FINISHED;
             }

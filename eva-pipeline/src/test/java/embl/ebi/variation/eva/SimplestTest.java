@@ -9,10 +9,7 @@ package embl.ebi.variation.eva;
 import org.junit.Test;
 import static org.junit.Assert.*;
 import org.junit.runner.RunWith;
-import org.springframework.batch.core.ExitStatus;
-import org.springframework.batch.core.Job;
-import org.springframework.batch.core.JobExecution;
-import org.springframework.batch.core.JobParameters;
+import org.springframework.batch.core.*;
 import org.springframework.batch.core.launch.JobLauncher;
 import org.springframework.batch.test.JobLauncherTestUtils;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -20,6 +17,9 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.core.env.Environment;
 import org.springframework.test.context.ContextConfiguration;
 import org.springframework.test.context.junit4.SpringJUnit4ClassRunner;
+
+import java.util.HashMap;
+import java.util.Map;
 
 /**
  *
@@ -30,18 +30,24 @@ import org.springframework.test.context.junit4.SpringJUnit4ClassRunner;
 //@ContextConfiguration(classes = VariantConfiguration.class)
 public class SimplestTest {
 
-        @Autowired Job job;
-        @Autowired JobLauncher jobLauncher;
-        @Autowired Environment env;
-        @Autowired SimplestProperties properties;
-	
-	@Test public void simpleTest() throws Exception {
-            JobExecution execution = jobLauncher.run(job, new JobParameters());
-            assertTrue(env.getProperty("compressGenotypes", Boolean.class));
-            assertTrue(properties.compressGenotypes);
-            assertEquals(ExitStatus.COMPLETED, execution.getExitStatus());
-	}
-	
+    @Autowired Job job;
+    @Autowired JobLauncher jobLauncher;
+    @Autowired Environment env;
+    @Autowired SimplestProperties properties;
+
+    @Test public void simpleTest() throws Exception {
+        Map<String, JobParameter> params = new HashMap<>();
+        String testInput = "testInput";
+        params.put("--input", new JobParameter(testInput));
+
+        JobExecution execution = jobLauncher.run(job, new JobParameters(params));
+
+        assertTrue(env.getProperty("compressGenotypes", Boolean.class));
+        assertTrue(properties.compressGenotypes);
+        assertEquals(testInput, properties.input);
+        assertEquals(ExitStatus.COMPLETED, execution.getExitStatus());
+    }
+
 //        @Autowired
 //        JobLauncherTestUtils jobLauncherTestUtils;
 //
