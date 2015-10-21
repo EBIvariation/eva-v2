@@ -52,20 +52,22 @@ public class SimplestTest {
         assertEquals(ExitStatus.COMPLETED, execution.getExitStatus());
     }
 
-    @Test
-    public void simpleMainTest() {
-
-        String testInput = "testInput";
-        String[] args = {
-                "--spring.batch.job.names=" + SimplestConfig.jobName,
-                "--input=" + testInput,
-        };
-
-        SpringApplication.run(Application.class, args);
-
-
-
-    }
+//    @Test
+//    public void simpleMainTest() {
+//
+//        String testInput = "testInput";
+//        String[] args = {
+//                "--spring.batch.job.names=" + SimplestConfig.jobName,
+//                "--input=" + testInput,
+//        };
+//
+//        SpringApplication.run(Application.class, args);
+//
+//
+//
+//    }
+    
+    
 //        @Autowired
 //        JobLauncherTestUtils jobLauncherTestUtils;
 //
