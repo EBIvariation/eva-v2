@@ -13,8 +13,6 @@
         <java.version>1.7</java.version>
         <opencga.version>0.5.2</opencga.version>
         <boot.version>1.2.6.RELEASE</boot.version>
-        <spring-batch-test.version>3.0.5.RELEASE</spring-batch-test.version>
-        <spring-test.version>4.0.5.RELEASE</spring-test.version>
     </properties>
 
     <modules>
