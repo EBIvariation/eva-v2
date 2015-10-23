@@ -7,6 +7,9 @@ jdk:
   - oraclejdk7
   - openjdk7
 
+env:
+- OPENCGA_HOME=/home/travis/build/EBIvariation/eva-v2/opencga/opencga-app/build
+
 before_install: chmod +x install-dependencies.sh
 
 install: ./install-dependencies.sh
