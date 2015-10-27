@@ -8,9 +8,18 @@ jdk:
   - openjdk7
 
 env:
-- OPENCGA_HOME=/home/travis/build/EBIvariation/eva-v2/opencga/opencga-app/build
+  - OPENCGA_HOME=/home/travis/build/EBIvariation/eva-v2/opencga/opencga-app/build MONGODB_VERSION=3.0.4
 
-before_install: chmod +x install-dependencies.sh
 
-install: ./install-dependencies.sh
+before_install:
+  - chmod +x install-dependencies.sh
+
+install:
+  - wget http://fastdl.mongodb.org/linux/mongodb-linux-x86_64-$MONGODB_VERSION.tgz
+  - tar xfz mongodb-linux-x86_64-$MONGODB_VERSION.tgz
+  - export PATH=`pwd`/mongodb-linux-x86_64-$MONGODB_VERSION/bin:$PATH
+  - mkdir -p data/db
+  - mongod --dbpath=data/db &
+  - ./install-dependencies.sh
+  - mongod --version
 
