@@ -10,9 +10,8 @@ import htsjdk.variant.variantcontext.writer.VariantContextWriterBuilder;
 import htsjdk.variant.vcf.VCFCodec;
 import htsjdk.variant.vcf.VCFFilterHeaderLine;
 import htsjdk.variant.vcf.VCFHeader;
-import org.opencb.biodata.models.variant.Variant;
-import org.opencb.biodata.models.variant.VariantSource;
-import org.opencb.biodata.models.variant.VariantSourceEntry;
+import org.opencb.biodata.models.variant.*;
+import org.opencb.commons.utils.StringUtils;
 import org.opencb.datastore.core.QueryOptions;
 import org.opencb.datastore.core.QueryResult;
 import org.opencb.opencga.storage.core.variant.adaptors.VariantSourceDBAdaptor;
@@ -24,6 +23,7 @@ import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.io.OutputStream;
 import java.util.*;
+import java.util.function.Predicate;
 import java.util.stream.Stream;
 
 /**
@@ -72,7 +72,7 @@ public class VariantExporter {
                     writer.add(variantContext);
                 }
             } catch (Exception e) {
-                e.printStackTrace();
+                logger.info("failed variant: ", e);
                 failedVariants++;
             }
         }
@@ -140,7 +140,7 @@ public class VariantExporter {
      * @param variant
      * @return
      */
-    public static VariantContext convertBiodataVariantToVariantContext(Variant variant) {//, StudyConfiguration studyConfiguration) {
+    public static VariantContext convertBiodataVariantToVariantContext(Variant variant) throws IOException {//, StudyConfiguration studyConfiguration) {
         VariantContextBuilder variantContextBuilder = new VariantContextBuilder();
 
         int start = variant.getStart();
@@ -149,9 +149,29 @@ public class VariantExporter {
         String alternate = variant.getAlternate();
         String filter = "PASS";
         List<String> allelesArray = Arrays.asList(reference, alternate);  // TODO jmmut: multiallelic
+
         ArrayList<Genotype> genotypes = new ArrayList<>();
 
         for (Map.Entry<String, VariantSourceEntry> source : variant.getSourceEntries().entrySet()) {
+            int emtpyAlleles = 0;
+            for (String a : allelesArray) {
+                emtpyAlleles += a.isEmpty()? 1: 0;
+            }
+            if (emtpyAlleles != 0) {
+                String src = source.getValue().getAttribute("src");
+                if (src != null) {
+                    String[] split = src.split("\t", 6);
+                    start = Integer.parseInt(split[1]);
+                    String ref = split[3];
+                    end = start + ref.length()-1;
+                    String[] alts = split[4].split(",");
+                    allelesArray = new ArrayList<>();
+                    allelesArray.add(ref);
+                    Collections.addAll(allelesArray, alts);
+                    logger.debug("using original alleles from vcf line in \"{}_{}_{}_{}\". original ref and alts: {}:{}",
+                            variant.getChromosome(), start, reference, alternate, ref, String.join(",", alts));
+                }
+            }
             for (Map.Entry<String, Map<String, String>> samplesData : source.getValue().getSamplesData().entrySet()) {
                 // reminder of samplesData meaning: Map(sampleName -> Map(dataType -> value))
                 String sampleName = samplesData.getKey();

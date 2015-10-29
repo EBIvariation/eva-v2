@@ -33,7 +33,8 @@ public class VariantExporterTest {
 
         QueryOptions query = new QueryOptions();
         QueryOptions options = new QueryOptions();
-        List<String> files = Arrays.asList("5");
+//        List<String> files = Arrays.asList("5");
+        List<String> files = Arrays.asList("5", "6");
         List<String> studies = Arrays.asList("7");
         String dbName = "batch";
         String fileName = "exported.vcf";
