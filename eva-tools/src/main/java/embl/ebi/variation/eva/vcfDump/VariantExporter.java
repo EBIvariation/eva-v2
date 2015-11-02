@@ -8,10 +8,8 @@ import htsjdk.variant.variantcontext.writer.Options;
 import htsjdk.variant.variantcontext.writer.VariantContextWriter;
 import htsjdk.variant.variantcontext.writer.VariantContextWriterBuilder;
 import htsjdk.variant.vcf.VCFCodec;
-import htsjdk.variant.vcf.VCFFilterHeaderLine;
 import htsjdk.variant.vcf.VCFHeader;
 import org.opencb.biodata.models.variant.*;
-import org.opencb.commons.utils.StringUtils;
 import org.opencb.datastore.core.QueryOptions;
 import org.opencb.datastore.core.QueryResult;
 import org.opencb.opencga.storage.core.variant.adaptors.VariantSourceDBAdaptor;
@@ -23,8 +21,6 @@ import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.io.OutputStream;
 import java.util.*;
-import java.util.function.Predicate;
-import java.util.stream.Stream;
 
 /**
  * Created by jmmut on 2015-10-28.
@@ -67,7 +63,7 @@ public class VariantExporter {
         while (iterator.hasNext()) {
             Variant variant = iterator.next();
             try {
-                VariantContext variantContext = convertBiodataVariantToVariantContext(variant);
+                VariantContext variantContext = convertBiodataVariantToVariantContext(variant, sourceDBAdaptor);
                 if (variantContext != null) {
                     writer.add(variantContext);
                 }
@@ -131,28 +127,42 @@ public class VariantExporter {
         return (VCFHeader) featureCodecHeader.getHeaderValue();
     }
 
+    private static class VariantFields {
+        public int start;
+        public int end;
+        public String reference;
+        public String alternate;
+    }
 
     /**
      * converts org.opencb.biodata.models.variant.Variant into a htsjdk.variant.variantcontext.VariantContext
-     * some assumptions:
-     * * splitted multiallelic variants will produce only one variantContexts. Merging is done
-     * * If some normalization have been done to the variant, the source entries may have an attribute ORI like: "POS:REF:ALT_0(,ALT_N)*:ALT_IDX"
+     * behaviour:
+     * * split multiallelic variant will remain split.
+     * * in case a normalized INDEL has empty alleles, the original alleles in the vcf line will be used.
+     *
+     * steps:
+     * * get main variant data: position, alleles, filter...
+     * * if there are empty alleles, get them from the vcf line
+     * * get the genotypes
+     * * add all (position, alleles, genotypes...) to a VariantContext.
+     *
      * @param variant
      * @return
      */
-    public static VariantContext convertBiodataVariantToVariantContext(Variant variant) throws IOException {//, StudyConfiguration studyConfiguration) {
+    public static VariantContext convertBiodataVariantToVariantContext(Variant variant, VariantSourceDBAdaptor sourceDBAdaptor) throws IOException {//, StudyConfiguration studyConfiguration) {
         VariantContextBuilder variantContextBuilder = new VariantContextBuilder();
 
-        int start = variant.getStart();
-        int end = variant.getEnd();
+        Integer start = variant.getStart();
+        Integer end = variant.getEnd();
         String reference = variant.getReference();
         String alternate = variant.getAlternate();
         String filter = "PASS";
-        List<String> allelesArray = Arrays.asList(reference, alternate);  // TODO jmmut: multiallelic
-
+        List<String> allelesArray = Arrays.asList(reference, alternate);
         ArrayList<Genotype> genotypes = new ArrayList<>();
 
         for (Map.Entry<String, VariantSourceEntry> source : variant.getSourceEntries().entrySet()) {
+
+            // if there are indels, we cannot use the normalized alleles, (hts forbids empty alleles) so we have to take them from the original vcf line
             int emtpyAlleles = 0;
             for (String a : allelesArray) {
                 emtpyAlleles += a.isEmpty()? 1: 0;
@@ -160,56 +170,40 @@ public class VariantExporter {
             if (emtpyAlleles != 0) {
                 String src = source.getValue().getAttribute("src");
                 if (src != null) {
-                    String[] split = src.split("\t", 6);
-                    start = Integer.parseInt(split[1]);
-                    String ref = split[3];
-                    end = start + ref.length()-1;
-                    String[] alts = split[4].split(",");
+                    VariantFields variantFields = getVariantFields(variant, sourceDBAdaptor, source.getValue(), src);
+
+                    // overwrite the initial-guess position and alleles
                     allelesArray = new ArrayList<>();
-                    allelesArray.add(ref);
-                    Collections.addAll(allelesArray, alts);
-                    logger.debug("using original alleles from vcf line in \"{}_{}_{}_{}\". original ref and alts: {}:{}",
-                            variant.getChromosome(), start, reference, alternate, ref, String.join(",", alts));
+                    allelesArray.add(variantFields.reference);
+                    allelesArray.add(variantFields.alternate);
+                    start = variantFields.start;
+                    end = variantFields.end;
                 }
             }
+
+            // add the genotypes
             for (Map.Entry<String, Map<String, String>> samplesData : source.getValue().getSamplesData().entrySet()) {
                 // reminder of samplesData meaning: Map(sampleName -> Map(dataType -> value))
                 String sampleName = samplesData.getKey();
                 String gt = samplesData.getValue().get("GT");
-//                System.out.println("gt = " + gt);
+
                 if (gt != null) {
                     org.opencb.biodata.models.feature.Genotype genotype = new org.opencb.biodata.models.feature.Genotype(gt, reference, alternate);
                     List<Allele> alleles = new ArrayList<>();
-//                    System.out.println("\tgenotype = " + genotype.getReference().toString());
-//                    System.out.println("\tgenotype = " + genotype.getAlternate().toString());
                     for (int gtIdx : genotype.getAllelesIdx()) {
-//                        System.out.println("\t\t>>"+originalAlleles);
-//                        System.out.println("\t\t>>"+gtIdx);
-//                        System.out.println("\t\t>>"+originalAlleles.get(gtIdx));
-
-                        /*
-                        if (gtIdx < originalAlleles.size() && gtIdx >= 0) {
-                            alleles.add(Allele.create(originalAlleles.get(gtIdx), gtIdx == 0));    // allele is reference if the alleleIndex is 0
-//                            alleles.add(Allele.create(allele, gtIdx == 0));    // allele is reference if the alleleIndex is 0
-                        } else {
-                            alleles.add(Allele.create(".", false)); // genotype of a secondary alternate, or an actual missing
-                        }
-                        */
-
                         if (gtIdx < allelesArray.size() && gtIdx >= 0) {
                             alleles.add(Allele.create(allelesArray.get(gtIdx), gtIdx == 0));    // allele is reference if the alleleIndex is 0
-//                            alleles.add(Allele.create(allele, gtIdx == 0));    // allele is reference if the alleleIndex is 0
                         } else {
                             alleles.add(Allele.create(".", false)); // genotype of a secondary alternate, or an actual missing
                         }
-
                     }
                     genotypes.add(new GenotypeBuilder().name(sampleName).alleles(alleles).phased(genotype.isPhased()).make());
                 }
             }
         }
 
-        variantContextBuilder.chr(variant.getChromosome())
+        variantContextBuilder
+                .chr(variant.getChromosome())
                 .start(start)
                 .stop(end)
                 .id(String.join(",", variant.getIds()))
@@ -218,129 +212,62 @@ public class VariantExporter {
                 .filter(filter)
                 .genotypes(genotypes);
 
-
         return variantContextBuilder.make();
+    }
 
+    /**
+     * In case there is an INDEL (multiallelic or not), we have to retrieve the alleles from the original vcf line.
+     * @param variant
+     * @param sourceDBAdaptor
+     * @param source
+     * @param src
+     * @return
+     */
+    private static VariantFields getVariantFields(Variant variant, VariantSourceDBAdaptor sourceDBAdaptor,
+                                                  VariantSourceEntry source, String src) {
+        String[] split = src.split("\t", 6);
+        StringBuilder newLineBuilder = new StringBuilder();
+        for (int i = 0; i < split.length - 1; i++) {
+            newLineBuilder.append(split[i]).append("\t");
+        }
+        newLineBuilder.append(".\t.\t.");   // ignoring qual, filter, info, format and genotypes. We just want normalization
+        VariantFactory variantFactory = new VariantVcfFactory();
+        QueryOptions sourceOptions = new QueryOptions();
+        sourceOptions.add("studyId", source.getStudyId());
+        sourceOptions.add("fileId", source.getFileId());
+        QueryResult<VariantSource> allSources = sourceDBAdaptor.getAllSources(sourceOptions);
+        if (allSources.getResult().size() < 1) {
+            throw new IllegalArgumentException("VariantSource not available with options " + sourceOptions.toString());
+        }
+        List<Variant> variants = variantFactory.create(allSources.getResult().get(0), newLineBuilder.toString());
 
-
-
-//        if (reference.isEmpty()) {
-//            try {
-//                QueryResponse<QueryResult<GenomeSequenceFeature>> resultQueryResponse = cellbaseClient.getSequence(
-//                        CellBaseClient.Category.genomic,
-//                        CellBaseClient.SubCategory.region,
-//                        Arrays.asList(Region.parseRegion(variant.getChromosome() + ":" + start + "-" + start)),
-//                        new QueryOptions());
-//                indelSequence = resultQueryResponse.getResponse().get(0).getResult().get(0).getSequence();
-//                reference = indelSequence;
-//                alternate = indelSequence + alternate;
-//                end = start + reference.length() - 1;
-////                if ((end - start) != reference.length()) {
-////                    end = start + reference.length() - 1;
-////                }
-//            } catch (IOException e) {
-//                e.printStackTrace();
-//            }
-//        }
-//        if (alternate.isEmpty()) {
-//            try {
-//                start -= reference.length();
-//                QueryResponse<QueryResult<GenomeSequenceFeature>> resultQueryResponse = cellbaseClient.getSequence(
-//                        CellBaseClient.Category.genomic,
-//                        CellBaseClient.SubCategory.region,
-//                        Arrays.asList(Region.parseRegion(variant.getChromosome() + ":" + start + "-" + start)),
-//                        new QueryOptions());
-//                indelSequence = resultQueryResponse.getResponse().get(0).getResult().get(0).getSequence();
-//                reference = indelSequence + reference;
-//                alternate = indelSequence;
-//                if ((end - start) != reference.length()) {
-//                    end = start + reference.length() - 1;
-//                }
-//            } catch (IOException e) {
-//                e.printStackTrace();
-//            }
-//        }
-
-
-        ////////////////////
-/*
-        List<String> allelesArray = Arrays.asList(reference, alternate);  // TODO jmmut: multiallelic
-        ArrayList<Genotype> genotypes = new ArrayList<>();
-        Integer originalPosition = null;
-        List<String> originalAlleles = null;
-        for (StudyEntry studyEntry : variant.getStudies()) {
-            String[] ori = getOri(studyEntry);
-            Integer auxOriginalPosition = getOriginalPosition(ori);
-            if (originalPosition != null && auxOriginalPosition != null && !originalPosition.equals(auxOriginalPosition)) {
-                throw new IllegalStateException("Two or more VariantSourceEntries have different origin. Unable to merge");
+        int alleleNumber = 0;
+        for (Variant v : variants) {
+            // reference should be always equal; this may be shortened
+            if (v.getReference().equals(variant.getReference()) && v.getAlternate().equals(variant.getAlternate())) {
+                break;
             }
-            originalPosition = auxOriginalPosition;
-            originalAlleles = getOriginalAlleles(ori);
-            if (originalAlleles == null) {
-                originalAlleles = allelesArray;
-            }
-
-            //Only print those variants in which the alternate is the first alternate from the multiallelic alternatives
-            if (originalAlleles.size() > 2 && !"0".equals(getOriginalAlleleIndex(ori))) {
-                logger.debug("Skip multiallelic variant! " + variant);
-                return null;
-            }
-
-
-            String sourceFilter = studyEntry.getAttribute("FILTER");
-            if (sourceFilter != null && !filter.equals(sourceFilter)) {
-                filter = ".";   // write PASS iff all sources agree that the filter is "PASS" or assumed if not present, otherwise write "."
-            }
-
-            for (String sampleName : studyEntry.getOrderedSamplesName()) {
-                Map<String, String> sampleData = studyEntry.getSampleData(sampleName);
-                String gt = sampleData.get("GT");
-//                System.out.println("gt = " + gt);
-                if (gt != null) {
-                    org.opencb.biodata.models.feature.Genotype genotype = new org.opencb.biodata.models.feature.Genotype(gt, reference, alternate);
-                    List<Allele> alleles = new ArrayList<>();
-//                    System.out.println("\tgenotype = " + genotype.getReference().toString());
-//                    System.out.println("\tgenotype = " + genotype.getAlternate().toString());
-                    for (int gtIdx : genotype.getAllelesIdx()) {
-//                        System.out.println("\t\t>>"+originalAlleles);
-//                        System.out.println("\t\t>>"+gtIdx);
-//                        System.out.println("\t\t>>"+originalAlleles.get(gtIdx));
-//                        String allele = originalAlleles.get(gtIdx);
-//                        if (allele == null || allele.isEmpty()) {
-//                            allele = "A";
-//                        }
-                        if (gtIdx < originalAlleles.size() && gtIdx >= 0) {
-                            alleles.add(Allele.create(originalAlleles.get(gtIdx), gtIdx == 0));    // allele is reference if the alleleIndex is 0
-//                            alleles.add(Allele.create(allele, gtIdx == 0));    // allele is reference if the alleleIndex is 0
-                        } else {
-                            alleles.add(Allele.create(".", false)); // genotype of a secondary alternate, or an actual missing
-                        }
-                    }
-                    genotypes.add(new GenotypeBuilder().name(sampleName).alleles(alleles).phased(genotype.isPhased()).make());
-                }
-            }
+            alleleNumber++;
         }
 
-        List<String> ids = variant.getIds();
-
-        variantContextBuilder.start(originalPosition == null ? start : originalPosition)
-                .stop((originalPosition == null ? start : originalPosition) + (originalAlleles == null? allelesArray : originalAlleles).get(0).length() - 1)
-                .chr(variant.getChromosome())
-                .alleles(originalAlleles == null? allelesArray : originalAlleles)
-                .filter(filter)
-                .genotypes(genotypes);
-//                .attributes(variant.)// TODO jmmut: join attributes from different source entries? what to do on a collision?
-
-
-        if (ids != null) {
-            Optional<String> reduce = variant.getIds().stream().reduce((left, right) -> left + "," + right);
-            if (reduce.isPresent()) {
-                variantContextBuilder.id(reduce.get());
-            }
+        String[] alts = split[4].split(",");
+        if (alleleNumber >= alts.length) {
+            throw new IllegalArgumentException(String.format(
+                    "Variant \"%s_%s_%s_%s\" has empty alleles and no original line",
+                    variant.getChromosome(), variant.getStart(), variant.getReference(), variant.getAlternate()));
         }
 
-        return variantContextBuilder.make();
-        */
+        VariantFields variantFields = new VariantFields();
+        variantFields.reference = split[3];
+        variantFields.alternate = alts[alleleNumber];
+        variantFields.start = Integer.parseInt(split[1]);
+        variantFields.end = variantFields.start + variantFields.reference.length()-1;
+
+        logger.debug("Using original alleles from vcf line in \"{}_{}_{}_{}\". Original ref and alts: \"{}:{}\". Output: \"{}\"",
+                variant.getChromosome(), variant.getStart(), variant.getReference(), variant.getAlternate(),
+                variantFields.reference, String.join(",", alts),
+                variantFields.reference, variantFields.alternate);
+        return variantFields;
     }
 
 }
