@@ -33,9 +33,9 @@ public class VariantExporter {
     /**
      *
      * @param iterator
-     * @param outputStream
-     * @param sourceDBAdaptor
-     * @param options TODO fill
+     * @param outputStream where to write the output vcf. you can use a GZIPOutputStrem for compressed files
+     * @param sourceDBAdaptor to retrieve all the VariantSources in any VariantSourceEntry.
+     * @param options not implemented yet, use only for studyId and fileId
      * @return num variants not written due to errors
      * @throws Exception
      */
@@ -63,7 +63,7 @@ public class VariantExporter {
         while (iterator.hasNext()) {
             Variant variant = iterator.next();
             try {
-                VariantContext variantContext = convertBiodataVariantToVariantContext(variant, sourceDBAdaptor);
+                VariantContext variantContext = convertBiodataVariantToVariantContext(variant, sourceDBAdaptor, options);
                 if (variantContext != null) {
                     writer.add(variantContext);
                 }
@@ -102,6 +102,8 @@ public class VariantExporter {
             throw new IllegalArgumentException("file headers not available with options " + options.toString());
         }
         String fileHeader = headers.get(0);
+
+        //TODO: allow specify which samples to return
 /*
         int lastLineIndex = fileHeader.lastIndexOf("#CHROM");
         if (lastLineIndex >= 0) {
@@ -149,7 +151,9 @@ public class VariantExporter {
      * @param variant
      * @return
      */
-    public static VariantContext convertBiodataVariantToVariantContext(Variant variant, VariantSourceDBAdaptor sourceDBAdaptor) throws IOException {//, StudyConfiguration studyConfiguration) {
+    public static VariantContext convertBiodataVariantToVariantContext(Variant variant, VariantSourceDBAdaptor sourceDBAdaptor, QueryOptions sourceOptions)
+            throws IOException {
+
         VariantContextBuilder variantContextBuilder = new VariantContextBuilder();
 
         Integer start = variant.getStart();
@@ -170,7 +174,13 @@ public class VariantExporter {
             if (emtpyAlleles != 0) {
                 String src = source.getValue().getAttribute("src");
                 if (src != null) {
-                    VariantFields variantFields = getVariantFields(variant, sourceDBAdaptor, source.getValue(), src);
+                    sourceOptions.add("studyId", source.getValue().getStudyId());
+                    sourceOptions.add("fileId", source.getValue().getFileId());
+                    QueryResult<VariantSource> allSources = sourceDBAdaptor.getAllSources(sourceOptions);   // TODO cache this
+                    if (allSources.getResult().size() < 1) {
+                        throw new IllegalArgumentException("VariantSource not available with options " + sourceOptions.toString());
+                    }
+                    VariantFields variantFields = getVariantFields(variant, allSources.getResult().get(0), src);
 
                     // overwrite the initial-guess position and alleles
                     allelesArray = new ArrayList<>();
@@ -206,7 +216,7 @@ public class VariantExporter {
                 .chr(variant.getChromosome())
                 .start(start)
                 .stop(end)
-                .id(String.join(",", variant.getIds()))
+                .id(String.join(";", variant.getIds()))
                 .alleles(allelesArray)
                 .genotypes()
                 .filter(filter)
@@ -218,28 +228,18 @@ public class VariantExporter {
     /**
      * In case there is an INDEL (multiallelic or not), we have to retrieve the alleles from the original vcf line.
      * @param variant
-     * @param sourceDBAdaptor
-     * @param source
-     * @param src
-     * @return
+     * @param variantSource
+     * @param srcLine  @return
      */
-    private static VariantFields getVariantFields(Variant variant, VariantSourceDBAdaptor sourceDBAdaptor,
-                                                  VariantSourceEntry source, String src) {
-        String[] split = src.split("\t", 6);
+    private static VariantFields getVariantFields(Variant variant, VariantSource variantSource, String srcLine) {
+        String[] split = srcLine.split("\t", 6);
         StringBuilder newLineBuilder = new StringBuilder();
         for (int i = 0; i < split.length - 1; i++) {
             newLineBuilder.append(split[i]).append("\t");
         }
         newLineBuilder.append(".\t.\t.");   // ignoring qual, filter, info, format and genotypes. We just want normalization
         VariantFactory variantFactory = new VariantVcfFactory();
-        QueryOptions sourceOptions = new QueryOptions();
-        sourceOptions.add("studyId", source.getStudyId());
-        sourceOptions.add("fileId", source.getFileId());
-        QueryResult<VariantSource> allSources = sourceDBAdaptor.getAllSources(sourceOptions);
-        if (allSources.getResult().size() < 1) {
-            throw new IllegalArgumentException("VariantSource not available with options " + sourceOptions.toString());
-        }
-        List<Variant> variants = variantFactory.create(allSources.getResult().get(0), newLineBuilder.toString());
+        List<Variant> variants = variantFactory.create(variantSource, newLineBuilder.toString());
 
         int alleleNumber = 0;
         for (Variant v : variants) {
@@ -263,7 +263,7 @@ public class VariantExporter {
         variantFields.start = Integer.parseInt(split[1]);
         variantFields.end = variantFields.start + variantFields.reference.length()-1;
 
-        logger.debug("Using original alleles from vcf line in \"{}_{}_{}_{}\". Original ref and alts: \"{}:{}\". Output: \"{}\"",
+        logger.debug("Using original alleles from vcf line in \"{}_{}_{}_{}\". Original ref and alts: \"{}:{}\". Output: \"{}:{}\"",
                 variant.getChromosome(), variant.getStart(), variant.getReference(), variant.getAlternate(),
                 variantFields.reference, String.join(",", alts),
                 variantFields.reference, variantFields.alternate);

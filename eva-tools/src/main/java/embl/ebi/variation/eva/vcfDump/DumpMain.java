@@ -15,6 +15,7 @@ import java.io.IOException;
 import java.io.OutputStream;
 import java.util.Arrays;
 import java.util.List;
+import java.util.zip.GZIPOutputStream;
 
 /**
  * Created by jmmut on 2015-10-28.
@@ -28,18 +29,15 @@ public class DumpMain {
 
         Config.setOpenCGAHome("/opt/opencga");
 
-        VariantExporter variantExporter = new VariantExporter();
-
-
         QueryOptions query = new QueryOptions();
         QueryOptions options = new QueryOptions();
         List<String> files = Arrays.asList("5");
         List<String> studies = Arrays.asList("7");
         String dbName = "batch";
-        String fileName = "exported.vcf";
+        String fileName = "exported.vcf.gz";
 
 
-        OutputStream outputStream = new FileOutputStream(fileName);
+        OutputStream outputStream = new GZIPOutputStream(new FileOutputStream(fileName));
         query.put(VariantDBAdaptor.FILES, files);
         query.put(VariantDBAdaptor.STUDIES, studies);
 
@@ -49,7 +47,8 @@ public class DumpMain {
         VariantDBIterator iterator = variantDBAdaptor.iterator(query);
         VariantSourceDBAdaptor variantSourceDBAdaptor = variantDBAdaptor.getVariantSourceDBAdaptor();
 
-        variantExporter.VcfHtsExport(iterator, outputStream, variantSourceDBAdaptor, options);
+        VariantExporter.VcfHtsExport(iterator, outputStream, variantSourceDBAdaptor, options);
+
 
     }
 }
