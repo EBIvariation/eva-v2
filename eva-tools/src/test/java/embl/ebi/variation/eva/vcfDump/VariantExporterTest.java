@@ -31,6 +31,7 @@ import java.util.zip.GZIPInputStream;
 import java.util.zip.GZIPOutputStream;
 
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertTrue;
 
 /**
  * Created by jmmut on 2015-10-29.
@@ -72,26 +73,11 @@ public class VariantExporterTest {
         // test file should not have failed variants
         assertEquals(0, failedVariants);
 
-        // counting lines (without comments)
-        BufferedReader file = new BufferedReader(new InputStreamReader(new GZIPInputStream(new FileInputStream(fileName))));
-        long lines = 0;
-        String line;
-        while ((line = file.readLine()) != null) {
-            if (line.charAt(0) != '#') {
-                lines++;
-            }
-        }
-        file.close();
-
-        // counting variants in the DB
         iterator = variantDBAdaptor.iterator(query);
-        int variantRows = 0;
-        while(iterator.hasNext()) {
-            iterator.next();
-            variantRows++;
-        }
+        assertEqualLinesFileAndDB(fileName, iterator);
 
-        assertEquals(variantRows, lines);
+        boolean delete = new File(fileName).delete();
+        assertTrue(delete);
     }
 
     @Test
@@ -130,6 +116,14 @@ public class VariantExporterTest {
         // test file should not have failed variants
         assertEquals(0, failedVariants);
 
+        iterator = variantDBAdaptor.iterator(query);
+        assertEqualLinesFileAndDB(fileName, iterator);
+
+        boolean delete = new File(fileName).delete();
+        assertTrue(delete);
+    }
+
+    private void assertEqualLinesFileAndDB(String fileName, VariantDBIterator iterator) throws IOException {
         // counting lines (without comments)
         BufferedReader file = new BufferedReader(new InputStreamReader(new GZIPInputStream(new FileInputStream(fileName))));
         long lines = 0;
@@ -142,7 +136,6 @@ public class VariantExporterTest {
         file.close();
 
         // counting variants in the DB
-        iterator = variantDBAdaptor.iterator(query);
         int variantRows = 0;
         while(iterator.hasNext()) {
             iterator.next();
