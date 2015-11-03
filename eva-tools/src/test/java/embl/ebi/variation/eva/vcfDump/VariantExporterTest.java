@@ -1,8 +1,12 @@
 package embl.ebi.variation.eva.vcfDump;
 
+import com.mongodb.DB;
+import com.mongodb.MongoClient;
 import htsjdk.variant.variantcontext.Allele;
 import htsjdk.variant.variantcontext.Genotype;
 import htsjdk.variant.variantcontext.VariantContext;
+import org.junit.AfterClass;
+import org.junit.BeforeClass;
 import org.junit.Test;
 import org.opencb.biodata.models.variant.Variant;
 import org.opencb.biodata.models.variant.VariantFactory;
@@ -21,11 +25,12 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.*;
+import java.net.UnknownHostException;
 import java.util.*;
 import java.util.zip.GZIPInputStream;
 import java.util.zip.GZIPOutputStream;
 
-import static org.junit.Assert.*;
+import static org.junit.Assert.assertEquals;
 
 /**
  * Created by jmmut on 2015-10-29.
@@ -33,6 +38,9 @@ import static org.junit.Assert.*;
  * @author Jose Miguel Mut Lopez &lt;jmmut@ebi.ac.uk&gt;
  */
 public class VariantExporterTest {
+    private static final String DB_NAME = "VariantExporterTest";
+
+    private static final Logger logger = LoggerFactory.getLogger(VariantExporterTest.class);
 
     @Test
     public void testVcfHtsExport() throws Exception {
@@ -44,7 +52,6 @@ public class VariantExporterTest {
 //        List<String> files = Arrays.asList("5");
         List<String> files = Arrays.asList("5", "6");
         List<String> studies = Arrays.asList("7");
-        String dbName = "batch";
         String fileName = "exported.vcf.gz";
 
 
@@ -54,7 +61,65 @@ public class VariantExporterTest {
 
 
         VariantStorageManager variantStorageManager = StorageManagerFactory.getVariantStorageManager();
-        VariantDBAdaptor variantDBAdaptor = variantStorageManager.getDBAdaptor(dbName, null);
+        VariantDBAdaptor variantDBAdaptor = variantStorageManager.getDBAdaptor(DB_NAME, null);
+        VariantDBIterator iterator = variantDBAdaptor.iterator(query);
+        VariantSourceDBAdaptor variantSourceDBAdaptor = variantDBAdaptor.getVariantSourceDBAdaptor();
+
+        int failedVariants = VariantExporter.VcfHtsExport(iterator, outputStream, variantSourceDBAdaptor, options);
+
+        ////////// checks
+
+        // test file should not have failed variants
+        assertEquals(0, failedVariants);
+
+        // counting lines (without comments)
+        BufferedReader file = new BufferedReader(new InputStreamReader(new GZIPInputStream(new FileInputStream(fileName))));
+        long lines = 0;
+        String line;
+        while ((line = file.readLine()) != null) {
+            if (line.charAt(0) != '#') {
+                lines++;
+            }
+        }
+        file.close();
+
+        // counting variants in the DB
+        iterator = variantDBAdaptor.iterator(query);
+        int variantRows = 0;
+        while(iterator.hasNext()) {
+            iterator.next();
+            variantRows++;
+        }
+
+        assertEquals(variantRows, lines);
+    }
+
+    @Test
+    public void testFilter() throws Exception {
+
+        Config.setOpenCGAHome("/opt/opencga");
+
+        QueryOptions query = new QueryOptions();
+        QueryOptions options = new QueryOptions();
+//        List<String> files = Arrays.asList("5");
+        List<String> files = Arrays.asList("5");
+        List<String> studies = Arrays.asList("7");
+        String fileName = "exportedFiltered.vcf.gz";
+
+
+        OutputStream outputStream = new GZIPOutputStream(new FileOutputStream(fileName));
+
+        // tell all variables to filter with
+        query.put(VariantDBAdaptor.FILES, files);
+        query.put(VariantDBAdaptor.STUDIES, studies);
+        query.put(VariantDBAdaptor.REGION, "20:61000-69000");
+        query.put(VariantDBAdaptor.REFERENCE, "A");
+//        query.put(VariantDBAdaptor., "A");
+
+
+
+        VariantStorageManager variantStorageManager = StorageManagerFactory.getVariantStorageManager();
+        VariantDBAdaptor variantDBAdaptor = variantStorageManager.getDBAdaptor(DB_NAME, null);
         VariantDBIterator iterator = variantDBAdaptor.iterator(query);
         VariantSourceDBAdaptor variantSourceDBAdaptor = variantDBAdaptor.getVariantSourceDBAdaptor();
 
@@ -151,6 +216,48 @@ public class VariantExporterTest {
             assertEquals(Allele.create(alleles.get(biodataGenotype.getAllele(1)), biodataGenotype.isAlleleRef(1)),
                     genotype.getAllele(1));
         }
+    }
+
+    @BeforeClass
+    public static void beforeTests() throws IOException, InterruptedException {
+        cleanDBs();
+        fillDB();
+    }
+
+    @AfterClass
+    public static void afterTests() throws UnknownHostException {
+        cleanDBs();
+    }
+
+    private static void cleanDBs() throws UnknownHostException {
+        // Delete Mongo collection
+        MongoClient mongoClient = new MongoClient("localhost");
+        List<String> dbs = Arrays.asList(DB_NAME);
+        for (String dbName : dbs) {
+            DB db = mongoClient.getDB(dbName);
+            db.dropDatabase();
+        }
+        mongoClient.close();
+    }
+
+    public static void fillDB() throws IOException, InterruptedException {
+        String dump = VariantExporterTest.class.getResource("/dump/").getFile();
+        logger.info("restoring DB from " + dump);
+        Process exec = Runtime.getRuntime().exec("mongorestore " + dump);
+        exec.waitFor();
+        String line;
+        BufferedReader bufferedReader = new BufferedReader(new InputStreamReader(exec.getInputStream()));
+        while ((line = bufferedReader.readLine()) != null) {
+            logger.info("mongorestore output:" + line);
+        }
+        bufferedReader.close();
+        bufferedReader = new BufferedReader(new InputStreamReader(exec.getErrorStream()));
+        while ((line = bufferedReader.readLine()) != null) {
+            logger.info("mongorestore errorOutput:" + line);
+        }
+        bufferedReader.close();
+
+        logger.info("mongorestore exit value: " + exec.exitValue());
     }
 
     public class MockVariantSourceDBAdaptor implements VariantSourceDBAdaptor {

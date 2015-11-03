@@ -216,7 +216,8 @@ public class VariantExporter {
                 .chr(variant.getChromosome())
                 .start(start)
                 .stop(end)
-                .id(String.join(";", variant.getIds()))
+//                .id(String.join(";", variant.getIds()))   // in multiallelic, this results in duplicated ids, across several rows
+                .noID()
                 .alleles(allelesArray)
                 .genotypes()
                 .filter(filter)
