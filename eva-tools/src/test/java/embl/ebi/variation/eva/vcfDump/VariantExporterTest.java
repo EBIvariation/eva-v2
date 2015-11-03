@@ -46,7 +46,7 @@ public class VariantExporterTest {
     @Test
     public void testVcfHtsExport() throws Exception {
 
-        Config.setOpenCGAHome("/opt/opencga");
+        Config.setOpenCGAHome(System.getenv("OPENCGA_HOME") != null ? System.getenv("OPENCGA_HOME") : "/opt/opencga");
 
         QueryOptions query = new QueryOptions();
         QueryOptions options = new QueryOptions();
@@ -83,7 +83,7 @@ public class VariantExporterTest {
     @Test
     public void testFilter() throws Exception {
 
-        Config.setOpenCGAHome("/opt/opencga");
+        Config.setOpenCGAHome(System.getenv("OPENCGA_HOME") != null ? System.getenv("OPENCGA_HOME") : "/opt/opencga");
 
         QueryOptions query = new QueryOptions();
         QueryOptions options = new QueryOptions();
