@@ -264,9 +264,14 @@ public class VariantExporter {
         variantFields.start = Integer.parseInt(split[1]);
         variantFields.end = variantFields.start + variantFields.reference.length()-1;
 
+        StringBuilder stringBuilder = new StringBuilder(alts[0]);
+        for (int i = 1; i < alts.length; i++) {
+            stringBuilder.append(",").append(alts[i]);
+        }
+
         logger.debug("Using original alleles from vcf line in \"{}_{}_{}_{}\". Original ref and alts: \"{}:{}\". Output: \"{}:{}\"",
                 variant.getChromosome(), variant.getStart(), variant.getReference(), variant.getAlternate(),
-                variantFields.reference, String.join(",", alts),
+                variantFields.reference, stringBuilder.toString(),
                 variantFields.reference, variantFields.alternate);
         return variantFields;
     }
