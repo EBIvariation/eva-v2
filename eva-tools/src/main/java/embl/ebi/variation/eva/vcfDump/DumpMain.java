@@ -35,6 +35,12 @@ import java.util.zip.GZIPOutputStream;
 /**
  * Created by jmmut on 2015-10-28.
  *
+ * Example skeleton usage of the VariantExporter. An actual CLI is intended to be developed here.
+ * This class doesn't work out of the box, as it needs an indexed vcf file in mongo with some hardcoded values:
+ * - fileId: "5"
+ * - studyId: "7"
+ * - dbName: "batch";
+ *
  * @author Jose Miguel Mut Lopez &lt;jmmut@ebi.ac.uk&gt;
  */
 public class DumpMain {
@@ -42,7 +48,7 @@ public class DumpMain {
     public static void main(String args[]) throws IllegalAccessException, ClassNotFoundException,
             InstantiationException, StorageManagerException, IOException {
 
-        Config.setOpenCGAHome("/opt/opencga");
+        Config.setOpenCGAHome(System.getenv("OPENCGA_HOME") != null ? System.getenv("OPENCGA_HOME") : "/opt/opencga");
 
         QueryOptions query = new QueryOptions();
         QueryOptions options = new QueryOptions();
