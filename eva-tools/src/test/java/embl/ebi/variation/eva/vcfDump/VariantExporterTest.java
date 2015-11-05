@@ -96,6 +96,42 @@ public class VariantExporterTest {
     }
 
     @Test
+    public void testVcfHtsExportSeveralStudies() throws Exception {
+
+        Config.setOpenCGAHome(System.getenv("OPENCGA_HOME") != null ? System.getenv("OPENCGA_HOME") : "/opt/opencga");
+
+
+        QueryOptions query = new QueryOptions();
+        QueryOptions options = new QueryOptions();
+//        List<String> files = Arrays.asList("5");
+        List<String> files = Arrays.asList("5", "6");
+        List<String> studies = Arrays.asList("7", "8");
+        String fileName = "exported.vcf.gz";
+        OutputStream outputStream = new GZIPOutputStream(new FileOutputStream(fileName));
+        query.put(VariantDBAdaptor.FILES, files);
+        query.put(VariantDBAdaptor.STUDIES, studies);
+
+
+        VariantStorageManager variantStorageManager = StorageManagerFactory.getVariantStorageManager();
+        VariantDBAdaptor variantDBAdaptor = variantStorageManager.getDBAdaptor(DB_NAME, null);
+        VariantDBIterator iterator = variantDBAdaptor.iterator(query);
+        VariantSourceDBAdaptor variantSourceDBAdaptor = variantDBAdaptor.getVariantSourceDBAdaptor();
+
+        int failedVariants = VariantExporter.VcfHtsExport(iterator, "outdir", variantSourceDBAdaptor, options);
+
+        ////////// checks
+
+        // test file should not have failed variants
+        assertEquals(0, failedVariants);
+
+        iterator = variantDBAdaptor.iterator(query);
+        assertEqualLinesFileAndDB(fileName, iterator);
+
+        boolean delete = new File(fileName).delete();
+        assertTrue(delete);
+    }
+
+    @Test
     public void testFilter() throws Exception {
 
         Config.setOpenCGAHome(System.getenv("OPENCGA_HOME") != null ? System.getenv("OPENCGA_HOME") : "/opt/opencga");
