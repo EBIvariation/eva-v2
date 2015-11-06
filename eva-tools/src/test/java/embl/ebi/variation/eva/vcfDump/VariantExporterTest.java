@@ -67,13 +67,10 @@ public class VariantExporterTest {
         QueryOptions options = new QueryOptions();
 //        List<String> files = Arrays.asList("5");
         List<String> files = Arrays.asList("5", "6");
-        List<String> studies = Arrays.asList("7");
-        String fileName = "exported.vcf.gz";
-
-
-        OutputStream outputStream = new GZIPOutputStream(new FileOutputStream(fileName));
+        List<String> studies = Collections.singletonList("7");
         query.put(VariantDBAdaptor.FILES, files);
         query.put(VariantDBAdaptor.STUDIES, studies);
+        String outputDir = "./";
 
 
         VariantStorageManager variantStorageManager = StorageManagerFactory.getVariantStorageManager();
@@ -81,35 +78,34 @@ public class VariantExporterTest {
         VariantDBIterator iterator = variantDBAdaptor.iterator(query);
         VariantSourceDBAdaptor variantSourceDBAdaptor = variantDBAdaptor.getVariantSourceDBAdaptor();
 
-        int failedVariants = VariantExporter.VcfHtsExport(iterator, outputStream, variantSourceDBAdaptor, options);
+        List<String> outputFiles = VariantExporter.VcfHtsExport(iterator, outputDir, variantSourceDBAdaptor, options);
 
-        ////////// checks
-
-        // test file should not have failed variants
-        assertEquals(0, failedVariants);
+        ////// checks 
+        assertEquals(studies.size(), outputFiles.size());
+        assertEquals(0, VariantExporter.getFailedVariants());   // test file should not have failed variants
 
         iterator = variantDBAdaptor.iterator(query);
-        assertEqualLinesFileAndDB(fileName, iterator);
+        assertEqualLinesFilesAndDB(outputFiles, iterator);
 
-        boolean delete = new File(fileName).delete();
-        assertTrue(delete);
+        for (String outputFile : outputFiles) {
+            boolean delete = new File(outputFile).delete();
+            assertTrue(delete);
+        }
     }
-
+    
     @Test
     public void testVcfHtsExportSeveralStudies() throws Exception {
 
         Config.setOpenCGAHome(System.getenv("OPENCGA_HOME") != null ? System.getenv("OPENCGA_HOME") : "/opt/opencga");
-
 
         QueryOptions query = new QueryOptions();
         QueryOptions options = new QueryOptions();
 //        List<String> files = Arrays.asList("5");
         List<String> files = Arrays.asList("5", "6");
         List<String> studies = Arrays.asList("7", "8");
-        String fileName = "exported.vcf.gz";
-        OutputStream outputStream = new GZIPOutputStream(new FileOutputStream(fileName));
         query.put(VariantDBAdaptor.FILES, files);
         query.put(VariantDBAdaptor.STUDIES, studies);
+        String outputDir = "./";
 
 
         VariantStorageManager variantStorageManager = StorageManagerFactory.getVariantStorageManager();
@@ -117,20 +113,20 @@ public class VariantExporterTest {
         VariantDBIterator iterator = variantDBAdaptor.iterator(query);
         VariantSourceDBAdaptor variantSourceDBAdaptor = variantDBAdaptor.getVariantSourceDBAdaptor();
 
-        int failedVariants = VariantExporter.VcfHtsExport(iterator, "outdir", variantSourceDBAdaptor, options);
+        List<String> outputFiles = VariantExporter.VcfHtsExport(iterator, outputDir, variantSourceDBAdaptor, options);
 
         ////////// checks
 
-        // test file should not have failed variants
-        assertEquals(0, failedVariants);
-
-        iterator = variantDBAdaptor.iterator(query);
-        assertEqualLinesFileAndDB(fileName, iterator);
-
-        boolean delete = new File(fileName).delete();
-        assertTrue(delete);
+        assertEquals(studies.size(), outputFiles.size());
+        assertEquals(0, VariantExporter.getFailedVariants());
+        
+        for (String outputFile : outputFiles) {
+            boolean delete = new File(outputFile).delete();
+            assertTrue(delete);
+        }
     }
 
+    
     @Test
     public void testFilter() throws Exception {
 
@@ -141,10 +137,7 @@ public class VariantExporterTest {
 //        List<String> files = Arrays.asList("5");
         List<String> files = Arrays.asList("5");
         List<String> studies = Arrays.asList("7");
-        String fileName = "exportedFiltered.vcf.gz";
-
-
-        OutputStream outputStream = new GZIPOutputStream(new FileOutputStream(fileName));
+        String outputDir = "./";
 
         // tell all variables to filter with
         query.put(VariantDBAdaptor.FILES, files);
@@ -153,38 +146,41 @@ public class VariantExporterTest {
         query.put(VariantDBAdaptor.REFERENCE, "A");
 //        query.put(VariantDBAdaptor., "A");
 
-
-
         VariantStorageManager variantStorageManager = StorageManagerFactory.getVariantStorageManager();
         VariantDBAdaptor variantDBAdaptor = variantStorageManager.getDBAdaptor(DB_NAME, null);
         VariantDBIterator iterator = variantDBAdaptor.iterator(query);
         VariantSourceDBAdaptor variantSourceDBAdaptor = variantDBAdaptor.getVariantSourceDBAdaptor();
 
-        int failedVariants = VariantExporter.VcfHtsExport(iterator, outputStream, variantSourceDBAdaptor, options);
-
+        List<String> outputFiles = VariantExporter.VcfHtsExport(iterator, outputDir, variantSourceDBAdaptor, options);
+        
         ////////// checks
 
-        // test file should not have failed variants
-        assertEquals(0, failedVariants);
+        assertEquals(studies.size(), outputFiles.size());
+        assertEquals(0, VariantExporter.getFailedVariants());   // test file should not have failed variants
 
         iterator = variantDBAdaptor.iterator(query);
-        assertEqualLinesFileAndDB(fileName, iterator);
+        assertEqualLinesFilesAndDB(outputFiles, iterator);
 
-        boolean delete = new File(fileName).delete();
-        assertTrue(delete);
+        for (String outputFile : outputFiles) {
+            boolean delete = new File(outputFile).delete();
+            assertTrue(delete);
+        }
     }
 
-    private void assertEqualLinesFileAndDB(String fileName, VariantDBIterator iterator) throws IOException {
-        // counting lines (without comments)
-        BufferedReader file = new BufferedReader(new InputStreamReader(new GZIPInputStream(new FileInputStream(fileName))));
+    private void assertEqualLinesFilesAndDB(List<String> fileNames, VariantDBIterator iterator) throws IOException {
+
         long lines = 0;
-        String line;
-        while ((line = file.readLine()) != null) {
-            if (line.charAt(0) != '#') {
-                lines++;
+        for (String fileName : fileNames) {
+            // counting lines (without comments)
+            BufferedReader file = new BufferedReader(new InputStreamReader(new GZIPInputStream(new FileInputStream(fileName))));
+            String line;
+            while ((line = file.readLine()) != null) {
+                if (line.charAt(0) != '#') {
+                    lines++;
+                }
             }
+            file.close();
         }
-        file.close();
 
         // counting variants in the DB
         int variantRows = 0;

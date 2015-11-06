@@ -33,8 +33,9 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.ByteArrayInputStream;
+import java.io.File;
 import java.io.IOException;
-import java.io.OutputStream;
+import java.nio.file.Paths;
 import java.util.*;
 
 /**
@@ -45,27 +46,32 @@ import java.util.*;
 public class VariantExporter {
 
     private static final Logger logger = LoggerFactory.getLogger(VariantExporter.class);
+    private static int failedVariants = 0;
+
     /**
      *
      * @param iterator
-     * @param outputStream where to write the output vcf. you can use a GZIPOutputStrem for compressed files
+     * @param outputDir directory to write the output vcf(s).
      * @param sourceDBAdaptor to retrieve all the VariantSources in any VariantSourceEntry.
      * @param options not implemented yet, use only for studyId and fileId
      * @return num variants not written due to errors
      * @throws Exception
      */
-    public static int VcfHtsExport(Iterator<Variant> iterator, OutputStream outputStream,
-                                   VariantSourceDBAdaptor sourceDBAdaptor, QueryOptions options) throws IOException {
+    public static List<String> VcfHtsExport(Iterator<Variant> iterator, String outputDir,
+                                          VariantSourceDBAdaptor sourceDBAdaptor, QueryOptions options) throws IOException {
         final VCFHeader header = getVcfHeader(sourceDBAdaptor, options);
 //        header.addMetaDataLine(new VCFFilterHeaderLine("PASS", "Valid variant"));
 //        header.addMetaDataLine(new VCFFilterHeaderLine(".", "No FILTER info"));
 
         final SAMSequenceDictionary sequenceDictionary = header.getSequenceDictionary();
+        File file = Paths.get(outputDir).resolve("exported.vcf.gz").toFile();
+        List<String> files = new ArrayList<>();
+        files.add(file.getAbsolutePath());
 
         // setup writer
         VariantContextWriterBuilder builder = new VariantContextWriterBuilder();
         VariantContextWriter writer = builder
-                .setOutputStream(outputStream)
+                .setOutputFile(file)
                 .setReferenceDictionary(sequenceDictionary)
                 .unsetOption(Options.INDEX_ON_THE_FLY)
                 .build();
@@ -91,9 +97,11 @@ public class VariantExporter {
         if (failedVariants > 0) {
             logger.warn(failedVariants + " variants were not written due to errors");
         }
+        VariantExporter.failedVariants += failedVariants;
 
         writer.close();
-        return failedVariants;
+        
+        return files;
     }
 
     private static VCFHeader getVcfHeader(VariantSourceDBAdaptor sourceDBAdaptor, QueryOptions options) throws IOException {
@@ -142,6 +150,10 @@ public class VariantExporter {
         LineIterator source = vcfCodec.makeSourceFromStream(new ByteArrayInputStream(fileHeader.getBytes()));
         FeatureCodecHeader featureCodecHeader = vcfCodec.readHeader(source);
         return (VCFHeader) featureCodecHeader.getHeaderValue();
+    }
+
+    public static int getFailedVariants() {
+        return failedVariants;
     }
 
     private static class VariantFields {

@@ -55,10 +55,8 @@ public class DumpMain {
         List<String> files = Arrays.asList("5");
         List<String> studies = Arrays.asList("7");
         String dbName = "batch";
-        String fileName = "exported.vcf.gz";
+        String outputDir = "./";
 
-
-        OutputStream outputStream = new GZIPOutputStream(new FileOutputStream(fileName));
         query.put(VariantDBAdaptor.FILES, files);
         query.put(VariantDBAdaptor.STUDIES, studies);
 
@@ -68,7 +66,7 @@ public class DumpMain {
         VariantDBIterator iterator = variantDBAdaptor.iterator(query);
         VariantSourceDBAdaptor variantSourceDBAdaptor = variantDBAdaptor.getVariantSourceDBAdaptor();
 
-        VariantExporter.VcfHtsExport(iterator, outputStream, variantSourceDBAdaptor, options);
+        VariantExporter.VcfHtsExport(iterator, outputDir, variantSourceDBAdaptor, options);
 
 
     }
