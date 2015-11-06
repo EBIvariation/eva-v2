@@ -15,7 +15,6 @@
  */
 package embl.ebi.variation.eva.vcfDump;
 
-import htsjdk.samtools.SAMSequenceDictionary;
 import htsjdk.tribble.FeatureCodecHeader;
 import htsjdk.tribble.readers.LineIterator;
 import htsjdk.variant.variantcontext.*;
@@ -26,7 +25,7 @@ import htsjdk.variant.vcf.VCFCodec;
 import htsjdk.variant.vcf.VCFHeader;
 import org.opencb.biodata.models.variant.*;
 import org.opencb.datastore.core.QueryOptions;
-import org.opencb.datastore.core.QueryResult;
+import org.opencb.opencga.storage.core.variant.adaptors.VariantDBAdaptor;
 import org.opencb.opencga.storage.core.variant.adaptors.VariantSourceDBAdaptor;
 import org.opencb.opencga.storage.mongodb.variant.DBObjectToVariantSourceConverter;
 import org.slf4j.Logger;
@@ -50,33 +49,47 @@ public class VariantExporter {
 
     /**
      *
-     * @param iterator
+     * @param iterator where to get the variants from
      * @param outputDir directory to write the output vcf(s).
      * @param sourceDBAdaptor to retrieve all the VariantSources in any VariantSourceEntry.
      * @param options not implemented yet, use only for studyId and fileId
      * @return num variants not written due to errors
-     * @throws Exception
      */
     public static List<String> VcfHtsExport(Iterator<Variant> iterator, String outputDir,
-                                          VariantSourceDBAdaptor sourceDBAdaptor, QueryOptions options) throws IOException {
-        final VCFHeader header = getVcfHeader(sourceDBAdaptor, options);
+                                            VariantSourceDBAdaptor sourceDBAdaptor, QueryOptions options) throws IOException {
+
+
+        List<String> studyIds = options.getAsStringList(VariantDBAdaptor.STUDIES);
+        List<VariantSource> sourcesList = sourceDBAdaptor.getAllSourcesByStudyIds(studyIds, options).getResult();
+
+        Map<String, VariantSource> sources = new TreeMap<>();
+
+        for (VariantSource variantSource : sourcesList) {
+            sources.put(variantSource.getStudyId(), variantSource);
+        }
+        
+        Map<String, VCFHeader> headers = getVcfHeaders(sources);
 //        header.addMetaDataLine(new VCFFilterHeaderLine("PASS", "Valid variant"));
 //        header.addMetaDataLine(new VCFFilterHeaderLine(".", "No FILTER info"));
 
-        final SAMSequenceDictionary sequenceDictionary = header.getSequenceDictionary();
-        File file = Paths.get(outputDir).resolve("exported.vcf.gz").toFile();
+        String suffix = ".exported.vcf.gz";
         List<String> files = new ArrayList<>();
-        files.add(file.getAbsolutePath());
+        Map<String, VariantContextWriter> writers = new TreeMap<>();
 
-        // setup writer
-        VariantContextWriterBuilder builder = new VariantContextWriterBuilder();
-        VariantContextWriter writer = builder
-                .setOutputFile(file)
-                .setReferenceDictionary(sequenceDictionary)
-                .unsetOption(Options.INDEX_ON_THE_FLY)
-                .build();
-
-        writer.writeHeader(header);
+        // setup writers
+        for (String studyId : studyIds) {
+            VariantContextWriterBuilder builder = new VariantContextWriterBuilder();
+            File outFile = Paths.get(outputDir).resolve(studyId + suffix).toFile();
+            files.add(outFile.getPath());
+            VariantContextWriter writer = builder
+                    .setOutputFile(outFile)
+                    .setReferenceDictionary(headers.get(studyId).getSequenceDictionary())
+                    .unsetOption(Options.INDEX_ON_THE_FLY)
+                    .build();
+            writers.put(studyId, writer);
+            writer.writeHeader(headers.get(studyId));
+            
+        }
 
         // actual loop
         int failedVariants = 0;
@@ -84,9 +97,11 @@ public class VariantExporter {
         while (iterator.hasNext()) {
             Variant variant = iterator.next();
             try {
-                VariantContext variantContext = convertBiodataVariantToVariantContext(variant, sourceDBAdaptor, options);
-                if (variantContext != null) {
-                    writer.add(variantContext);
+                Map<String, VariantContext> variantContexts = convertBiodataVariantToVariantContext(variant, sources);
+                for (Map.Entry<String, VariantContext> variantContextEntry : variantContexts.entrySet()) {
+                    if (writers.containsKey(variantContextEntry.getKey())) {
+                        writers.get(variantContextEntry.getKey()).add(variantContextEntry.getValue());
+                    }
                 }
             } catch (Exception e) {
                 logger.info("failed variant: ", e);
@@ -99,35 +114,42 @@ public class VariantExporter {
         }
         VariantExporter.failedVariants += failedVariants;
 
-        writer.close();
-        
+        for (VariantContextWriter variantContextWriter : writers.values()) {
+            variantContextWriter.close();
+        }
+
         return files;
     }
 
-    private static VCFHeader getVcfHeader(VariantSourceDBAdaptor sourceDBAdaptor, QueryOptions options) throws IOException {
+    private static Map<String, VCFHeader> getVcfHeaders(Map<String, VariantSource> sources) throws IOException {
 
-        List<VariantSource> sources = sourceDBAdaptor.getAllSources(options).getResult();
-        List<String> headers = new ArrayList<>();
-        for (VariantSource source : sources) {
-
+        Map<String, VCFHeader> headers = new TreeMap<>();
+        
+        for (VariantSource source : sources.values()) {
             Object headerObject = source.getMetadata().get(DBObjectToVariantSourceConverter.HEADER_FIELD);
+
             if (headerObject instanceof String) {
-                headers.add((String)headerObject);
+                VCFCodec vcfCodec = new VCFCodec();
+                ByteArrayInputStream bufferedInputStream = new ByteArrayInputStream(((String) headerObject).getBytes());
+                LineIterator sourceFromStream = vcfCodec.makeSourceFromStream(bufferedInputStream);
+                FeatureCodecHeader featureCodecHeader = vcfCodec.readHeader(sourceFromStream);
+                headers.put(source.getStudyId(), (VCFHeader) featureCodecHeader.getHeaderValue());
             }
         }
-        //        get header from studyConfiguration
+        
+        for (String studyId : sources.keySet()) {
+            if (!headers.containsKey(studyId)) {
+                throw new IllegalArgumentException("file headers not available for study " + studyId);
+            }
+        }
 
+        return headers;
+        //TODO: allow specify which samples to return
+/*
 //        List<String> returnedSamples = new ArrayList<>();
 //        if (options != null) {
 //            returnedSamples = options.getAsStringList(VariantDBAdaptor.VariantQueryParams.RETURNED_SAMPLES.key());
 //        }
-        if (headers.size() < 1) {
-            throw new IllegalArgumentException("file headers not available with options " + options.toString());
-        }
-        String fileHeader = headers.get(0);
-
-        //TODO: allow specify which samples to return
-/*
         int lastLineIndex = fileHeader.lastIndexOf("#CHROM");
         if (lastLineIndex >= 0) {
             String substring = fileHeader.substring(0, lastLineIndex);
@@ -146,10 +168,7 @@ public class VariantExporter {
 //        return VariantFileMetadataToVCFHeaderConverter.parseVcfHeader(fileHeader);
 
         // */
-        VCFCodec vcfCodec = new VCFCodec();
-        LineIterator source = vcfCodec.makeSourceFromStream(new ByteArrayInputStream(fileHeader.getBytes()));
-        FeatureCodecHeader featureCodecHeader = vcfCodec.readHeader(source);
-        return (VCFHeader) featureCodecHeader.getHeaderValue();
+
     }
 
     public static int getFailedVariants() {
@@ -164,23 +183,28 @@ public class VariantExporter {
     }
 
     /**
-     * converts org.opencb.biodata.models.variant.Variant into a htsjdk.variant.variantcontext.VariantContext
+     * converts org.opencb.biodata.models.variant.Variant into one or more htsjdk.variant.variantcontext.VariantContext
      * behaviour:
+     * * one VariantContext per study
      * * split multiallelic variant will remain split.
      * * in case a normalized INDEL has empty alleles, the original alleles in the vcf line will be used.
      *
      * steps:
+     * * foreach variantSourceEntry, collect genotypes in its study, only if the study was requested
      * * get main variant data: position, alleles, filter...
      * * if there are empty alleles, get them from the vcf line
      * * get the genotypes
-     * * add all (position, alleles, genotypes...) to a VariantContext.
+     * * add all (position, alleles, genotypes...) to a VariantContext for each study.
      *
      * @param variant
      * @return
      */
-    public static VariantContext convertBiodataVariantToVariantContext(Variant variant, VariantSourceDBAdaptor sourceDBAdaptor, QueryOptions sourceOptions)
+    public static Map<String, VariantContext> convertBiodataVariantToVariantContext(
+            Variant variant, Map<String, VariantSource> sources) 
             throws IOException {
 
+        List<String> studyIds = new ArrayList<>(sources.keySet());
+        Map<String, VariantContext> variantContextMap = new TreeMap<>();
         VariantContextBuilder variantContextBuilder = new VariantContextBuilder();
 
         Integer start = variant.getStart();
@@ -190,67 +214,80 @@ public class VariantExporter {
         String filter = "PASS";
         List<String> allelesArray = Arrays.asList(reference, alternate);
         ArrayList<Genotype> genotypes = new ArrayList<>();
+        Map<String, List<Genotype>> genotypesPerStudy = new TreeMap<>();
+        
+        // preparing the map. if we found sourceEntries of studies different than these, we will ignore them
+        for (String studyId : studyIds) {
+            if (!genotypesPerStudy.containsKey(studyId)) {
+                genotypesPerStudy.put(studyId, new ArrayList<Genotype>());
+            }
+        }
 
         for (Map.Entry<String, VariantSourceEntry> source : variant.getSourceEntries().entrySet()) {
 
-            // if there are indels, we cannot use the normalized alleles, (hts forbids empty alleles) so we have to take them from the original vcf line
-            int emtpyAlleles = 0;
-            for (String a : allelesArray) {
-                emtpyAlleles += a.isEmpty()? 1: 0;
-            }
-            if (emtpyAlleles != 0) {
-                String src = source.getValue().getAttribute("src");
-                if (src != null) {
-                    sourceOptions.add("studyId", source.getValue().getStudyId());
-                    sourceOptions.add("fileId", source.getValue().getFileId());
-                    QueryResult<VariantSource> allSources = sourceDBAdaptor.getAllSources(sourceOptions);   // TODO cache this
-                    if (allSources.getResult().size() < 1) {
-                        throw new IllegalArgumentException("VariantSource not available with options " + sourceOptions.toString());
-                    }
-                    VariantFields variantFields = getVariantFields(variant, allSources.getResult().get(0), src);
+            String studyId = source.getValue().getStudyId();
 
-                    // overwrite the initial-guess position and alleles
-                    allelesArray = new ArrayList<>();
-                    allelesArray.add(variantFields.reference);
-                    allelesArray.add(variantFields.alternate);
-                    start = variantFields.start;
-                    end = variantFields.end;
+            if (genotypesPerStudy.containsKey(studyId)) {   // skipping studies not asked
+                // if there are indels, we cannot use the normalized alleles, (hts forbids empty alleles) so we have to take them from the original vcf line
+                int emtpyAlleles = 0;
+                for (String a : allelesArray) {
+                    emtpyAlleles += a.isEmpty() ? 1 : 0;
                 }
-            }
-
-            // add the genotypes
-            for (Map.Entry<String, Map<String, String>> samplesData : source.getValue().getSamplesData().entrySet()) {
-                // reminder of samplesData meaning: Map(sampleName -> Map(dataType -> value))
-                String sampleName = samplesData.getKey();
-                String gt = samplesData.getValue().get("GT");
-
-                if (gt != null) {
-                    org.opencb.biodata.models.feature.Genotype genotype = new org.opencb.biodata.models.feature.Genotype(gt, reference, alternate);
-                    List<Allele> alleles = new ArrayList<>();
-                    for (int gtIdx : genotype.getAllelesIdx()) {
-                        if (gtIdx < allelesArray.size() && gtIdx >= 0) {
-                            alleles.add(Allele.create(allelesArray.get(gtIdx), gtIdx == 0));    // allele is reference if the alleleIndex is 0
-                        } else {
-                            alleles.add(Allele.create(".", false)); // genotype of a secondary alternate, or an actual missing
+                if (emtpyAlleles != 0) {
+                    String src = source.getValue().getAttribute("src");
+                    if (src != null) {
+                        VariantSource variantSource = sources.get(studyId);
+                        if (variantSource == null) {
+                            throw new IllegalArgumentException("VariantSource not available for study " + studyId);
                         }
+                        VariantFields variantFields = getVariantFields(variant, variantSource, src);
+
+                        // overwrite the initial-guess position and alleles
+                        allelesArray = new ArrayList<>();
+                        allelesArray.add(variantFields.reference);
+                        allelesArray.add(variantFields.alternate);
+                        start = variantFields.start;
+                        end = variantFields.end;
                     }
-                    genotypes.add(new GenotypeBuilder().name(sampleName).alleles(alleles).phased(genotype.isPhased()).make());
+                }
+
+                // add the genotypes
+                for (Map.Entry<String, Map<String, String>> samplesData : source.getValue().getSamplesData().entrySet()) {
+                    // reminder of samplesData meaning: Map(sampleName -> Map(dataType -> value))
+                    String sampleName = samplesData.getKey();
+                    String gt = samplesData.getValue().get("GT");
+
+                    if (gt != null) {
+                        org.opencb.biodata.models.feature.Genotype genotype = new org.opencb.biodata.models.feature.Genotype(gt, reference, alternate);
+                        List<Allele> alleles = new ArrayList<>();
+                        for (int gtIdx : genotype.getAllelesIdx()) {
+                            if (gtIdx < allelesArray.size() && gtIdx >= 0) {
+                                alleles.add(Allele.create(allelesArray.get(gtIdx), gtIdx == 0));    // allele is reference if the alleleIndex is 0
+                            } else {
+                                alleles.add(Allele.create(".", false)); // genotype of a secondary alternate, or an actual missing
+                            }
+                        }
+                        genotypesPerStudy.get(studyId).add(
+                                new GenotypeBuilder().name(sampleName).alleles(alleles).phased(genotype.isPhased()).make());
+                    }
                 }
             }
         }
 
-        variantContextBuilder
-                .chr(variant.getChromosome())
-                .start(start)
-                .stop(end)
-//                .id(String.join(";", variant.getIds()))   // in multiallelic, this results in duplicated ids, across several rows
-                .noID()
-                .alleles(allelesArray)
-                .genotypes()
-                .filter(filter)
-                .genotypes(genotypes);
 
-        return variantContextBuilder.make();
+        for (Map.Entry<String, List<Genotype>> studyEntry : genotypesPerStudy.entrySet()) {
+            VariantContext make = variantContextBuilder
+                    .chr(variant.getChromosome())
+                    .start(start)
+                    .stop(end)
+//                .id(String.join(";", variant.getIds()))   // in multiallelic, this results in duplicated ids, across several rows
+                    .noID()
+                    .alleles(allelesArray)
+                    .filter(filter)
+                    .genotypes(studyEntry.getValue()).make();
+            variantContextMap.put(studyEntry.getKey(), make);
+        }
+        return variantContextMap;
     }
 
     /**

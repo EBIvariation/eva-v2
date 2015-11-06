@@ -64,7 +64,6 @@ public class VariantExporterTest {
         Config.setOpenCGAHome(System.getenv("OPENCGA_HOME") != null ? System.getenv("OPENCGA_HOME") : "/opt/opencga");
 
         QueryOptions query = new QueryOptions();
-        QueryOptions options = new QueryOptions();
 //        List<String> files = Arrays.asList("5");
         List<String> files = Arrays.asList("5", "6");
         List<String> studies = Collections.singletonList("7");
@@ -78,7 +77,7 @@ public class VariantExporterTest {
         VariantDBIterator iterator = variantDBAdaptor.iterator(query);
         VariantSourceDBAdaptor variantSourceDBAdaptor = variantDBAdaptor.getVariantSourceDBAdaptor();
 
-        List<String> outputFiles = VariantExporter.VcfHtsExport(iterator, outputDir, variantSourceDBAdaptor, options);
+        List<String> outputFiles = VariantExporter.VcfHtsExport(iterator, outputDir, variantSourceDBAdaptor, query);
 
         ////// checks 
         assertEquals(studies.size(), outputFiles.size());
@@ -99,7 +98,6 @@ public class VariantExporterTest {
         Config.setOpenCGAHome(System.getenv("OPENCGA_HOME") != null ? System.getenv("OPENCGA_HOME") : "/opt/opencga");
 
         QueryOptions query = new QueryOptions();
-        QueryOptions options = new QueryOptions();
 //        List<String> files = Arrays.asList("5");
         List<String> files = Arrays.asList("5", "6");
         List<String> studies = Arrays.asList("7", "8");
@@ -113,7 +111,7 @@ public class VariantExporterTest {
         VariantDBIterator iterator = variantDBAdaptor.iterator(query);
         VariantSourceDBAdaptor variantSourceDBAdaptor = variantDBAdaptor.getVariantSourceDBAdaptor();
 
-        List<String> outputFiles = VariantExporter.VcfHtsExport(iterator, outputDir, variantSourceDBAdaptor, options);
+        List<String> outputFiles = VariantExporter.VcfHtsExport(iterator, outputDir, variantSourceDBAdaptor, query);
 
         ////////// checks
 
@@ -133,7 +131,6 @@ public class VariantExporterTest {
         Config.setOpenCGAHome(System.getenv("OPENCGA_HOME") != null ? System.getenv("OPENCGA_HOME") : "/opt/opencga");
 
         QueryOptions query = new QueryOptions();
-        QueryOptions options = new QueryOptions();
 //        List<String> files = Arrays.asList("5");
         List<String> files = Arrays.asList("5");
         List<String> studies = Arrays.asList("7");
@@ -151,7 +148,7 @@ public class VariantExporterTest {
         VariantDBIterator iterator = variantDBAdaptor.iterator(query);
         VariantSourceDBAdaptor variantSourceDBAdaptor = variantDBAdaptor.getVariantSourceDBAdaptor();
 
-        List<String> outputFiles = VariantExporter.VcfHtsExport(iterator, outputDir, variantSourceDBAdaptor, options);
+        List<String> outputFiles = VariantExporter.VcfHtsExport(iterator, outputDir, variantSourceDBAdaptor, query);
         
         ////////// checks
 
@@ -201,11 +198,12 @@ public class VariantExporterTest {
         }
         variantSource.setSamples(samples);
         VariantFactory factory = new VariantVcfFactory();
-        VariantSourceDBAdaptor sourceDBAdaptor = new MockVariantSourceDBAdaptor(variantSource);
+        Map<String, VariantSource> sources = Collections.singletonMap(variantSource.getStudyId(), variantSource);
         QueryOptions options = new QueryOptions("fileId", "fileId");
-        options.add("studyId", "studyId");
+        String studyId = "studyId";
+        options.add("studyId", studyId);
         List<Variant> variants;
-        VariantContext variantContext;
+        Map<String, VariantContext> variantContext;
         List<String> alleles;
 
         // test multiallelic
@@ -213,22 +211,23 @@ public class VariantExporterTest {
         variants = factory.create(variantSource, multiallelicLine);
         assertEquals(2, variants.size());
 
-        variantContext = VariantExporter.convertBiodataVariantToVariantContext(variants.get(0), sourceDBAdaptor, options);
+        variantContext = VariantExporter.convertBiodataVariantToVariantContext(variants.get(0), sources);
+        
         alleles = Arrays.asList("C", "A", ".");
-        assertEqualGenotypes(variants.get(0), variantContext, alleles);
+        assertEqualGenotypes(variants.get(0), variantContext.get(studyId), alleles);
 
-        variantContext = VariantExporter.convertBiodataVariantToVariantContext(variants.get(1), sourceDBAdaptor, options);
+        variantContext = VariantExporter.convertBiodataVariantToVariantContext(variants.get(1), sources);
         alleles = Arrays.asList("C", "T", ".");
-        assertEqualGenotypes(variants.get(1), variantContext, alleles);
+        assertEqualGenotypes(variants.get(1), variantContext.get(studyId), alleles);
 
 
         // test indel
         String indelLine = "1\t1000\tid\tC\tCA\t100\tPASS\t.\tGT\t0|0\t0|0\t0|1\t1|1\t1|0\t0|1";
         variants = factory.create(variantSource, indelLine);
 
-        variantContext = VariantExporter.convertBiodataVariantToVariantContext(variants.get(0), sourceDBAdaptor, options);
+        variantContext = VariantExporter.convertBiodataVariantToVariantContext(variants.get(0), sources);
         alleles = Arrays.asList("C", "CA");
-        assertEqualGenotypes(variants.get(0), variantContext, alleles);
+        assertEqualGenotypes(variants.get(0), variantContext.get(studyId), alleles);
 
 
         // test multiallelic + indel
@@ -236,13 +235,13 @@ public class VariantExporterTest {
         variants = factory.create(variantSource, multiallelicIndelLine);
         assertEquals(2, variants.size());
 
-        variantContext = VariantExporter.convertBiodataVariantToVariantContext(variants.get(0), sourceDBAdaptor, options);
+        variantContext = VariantExporter.convertBiodataVariantToVariantContext(variants.get(0), sources);
         alleles = Arrays.asList("C", "CA", ".");
-        assertEqualGenotypes(variants.get(0), variantContext, alleles);
+        assertEqualGenotypes(variants.get(0), variantContext.get(studyId), alleles);
 
-        variantContext = VariantExporter.convertBiodataVariantToVariantContext(variants.get(1), sourceDBAdaptor, options);
+        variantContext = VariantExporter.convertBiodataVariantToVariantContext(variants.get(1), sources);
         alleles = Arrays.asList("C", "T", ".");
-        assertEqualGenotypes(variants.get(1), variantContext, alleles);
+        assertEqualGenotypes(variants.get(1), variantContext.get(studyId), alleles);
 
     }
 
