@@ -93,6 +93,11 @@ public class VariantExporter {
 
         // actual loop
         int failedVariants = 0;
+        StringBuilder filesConcat = new StringBuilder();
+        for (String file : files) {
+            filesConcat.append(file).append(" ");
+        }
+        logger.info("Exporting to files: [ " + filesConcat.toString() + "]");
 
         while (iterator.hasNext()) {
             Variant variant = iterator.next();
@@ -216,18 +221,18 @@ public class VariantExporter {
         ArrayList<Genotype> genotypes = new ArrayList<>();
         Map<String, List<Genotype>> genotypesPerStudy = new TreeMap<>();
         
-        // preparing the map. if we found sourceEntries of studies different than these, we will ignore them
-        for (String studyId : studyIds) {
-            if (!genotypesPerStudy.containsKey(studyId)) {
-                genotypesPerStudy.put(studyId, new ArrayList<Genotype>());
-            }
-        }
-
         for (Map.Entry<String, VariantSourceEntry> source : variant.getSourceEntries().entrySet()) {
 
             String studyId = source.getValue().getStudyId();
 
-            if (genotypesPerStudy.containsKey(studyId)) {   // skipping studies not asked
+            if (studyIds.contains(studyId)) {   // skipping studies not asked
+                
+                // if we added this outside the loop, if the study is not present in this variant, the writer would add 
+                // a whole line of "./."
+                if (!genotypesPerStudy.containsKey(studyId)) {  
+                    genotypesPerStudy.put(studyId, new ArrayList<Genotype>());
+                }
+                
                 // if there are indels, we cannot use the normalized alleles, (hts forbids empty alleles) so we have to take them from the original vcf line
                 int emtpyAlleles = 0;
                 for (String a : allelesArray) {

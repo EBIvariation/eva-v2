@@ -69,7 +69,7 @@ public class VariantExporterTest {
         List<String> studies = Collections.singletonList("7");
         query.put(VariantDBAdaptor.FILES, files);
         query.put(VariantDBAdaptor.STUDIES, studies);
-        String outputDir = "./";
+        String outputDir = "/tmp/";
 
 
         VariantStorageManager variantStorageManager = StorageManagerFactory.getVariantStorageManager();
@@ -103,7 +103,7 @@ public class VariantExporterTest {
         List<String> studies = Arrays.asList("7", "8");
         query.put(VariantDBAdaptor.FILES, files);
         query.put(VariantDBAdaptor.STUDIES, studies);
-        String outputDir = "./";
+        String outputDir = "/tmp/";
 
 
         VariantStorageManager variantStorageManager = StorageManagerFactory.getVariantStorageManager();
@@ -118,6 +118,17 @@ public class VariantExporterTest {
         assertEquals(studies.size(), outputFiles.size());
         assertEquals(0, VariantExporter.getFailedVariants());
         
+        // for study 7
+        query.put(VariantDBAdaptor.STUDIES, Collections.singletonList("7"));
+        iterator = variantDBAdaptor.iterator(query);
+        assertEquals(countRows(iterator), countLines(outputFiles.get(0)));
+        
+        // for study 8
+        query.put(VariantDBAdaptor.STUDIES, Collections.singletonList("8"));
+        iterator = variantDBAdaptor.iterator(query);
+        assertEquals(countRows(iterator), countLines(outputFiles.get(1)));
+        
+
         for (String outputFile : outputFiles) {
             boolean delete = new File(outputFile).delete();
             assertTrue(delete);
@@ -134,7 +145,7 @@ public class VariantExporterTest {
 //        List<String> files = Arrays.asList("5");
         List<String> files = Arrays.asList("5");
         List<String> studies = Arrays.asList("7");
-        String outputDir = "./";
+        String outputDir = "/tmp/";
 
         // tell all variables to filter with
         query.put(VariantDBAdaptor.FILES, files);
@@ -168,25 +179,36 @@ public class VariantExporterTest {
 
         long lines = 0;
         for (String fileName : fileNames) {
-            // counting lines (without comments)
-            BufferedReader file = new BufferedReader(new InputStreamReader(new GZIPInputStream(new FileInputStream(fileName))));
-            String line;
-            while ((line = file.readLine()) != null) {
-                if (line.charAt(0) != '#') {
-                    lines++;
-                }
-            }
-            file.close();
+            lines += countLines(fileName);
         }
 
         // counting variants in the DB
+        long variantRows = countRows(iterator);
+
+        assertEquals(variantRows, lines);
+    }
+
+    private long countRows(Iterator<Variant> iterator) {
         int variantRows = 0;
         while(iterator.hasNext()) {
             iterator.next();
             variantRows++;
         }
+        return variantRows;
+    }
 
-        assertEquals(variantRows, lines);
+    private long countLines(String fileName) throws IOException {
+        long lines;
+        lines = 0;
+        BufferedReader file = new BufferedReader(new InputStreamReader(new GZIPInputStream(new FileInputStream(fileName))));
+        String line;
+        while ((line = file.readLine()) != null) {
+            if (line.charAt(0) != '#') {
+                lines++;
+            }
+        }
+        file.close();
+        return lines;
     }
 
     @Test

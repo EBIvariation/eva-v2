@@ -51,7 +51,6 @@ public class DumpMain {
         Config.setOpenCGAHome(System.getenv("OPENCGA_HOME") != null ? System.getenv("OPENCGA_HOME") : "/opt/opencga");
 
         QueryOptions query = new QueryOptions();
-        QueryOptions options = new QueryOptions();
         List<String> files = Arrays.asList("5");
         List<String> studies = Arrays.asList("7");
         String dbName = "batch";
@@ -66,8 +65,6 @@ public class DumpMain {
         VariantDBIterator iterator = variantDBAdaptor.iterator(query);
         VariantSourceDBAdaptor variantSourceDBAdaptor = variantDBAdaptor.getVariantSourceDBAdaptor();
 
-        VariantExporter.VcfHtsExport(iterator, outputDir, variantSourceDBAdaptor, options);
-
-
+        List<String> fileNames = VariantExporter.VcfHtsExport(iterator, outputDir, variantSourceDBAdaptor, query);
     }
 }
