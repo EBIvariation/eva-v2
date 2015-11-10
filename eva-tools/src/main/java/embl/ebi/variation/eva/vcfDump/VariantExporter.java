@@ -78,6 +78,9 @@ public class VariantExporter {
 
         // setup writers
         for (String studyId : studyIds) {
+            if (!headers.containsKey(studyId)) {
+                throw new IllegalArgumentException("aborting VCF export: missing header for study " + studyId);
+            }
             VariantContextWriterBuilder builder = new VariantContextWriterBuilder();
             File outFile = Paths.get(outputDir).resolve(studyId + suffix).toFile();
             files.add(outFile.getPath());
@@ -88,7 +91,6 @@ public class VariantExporter {
                     .build();
             writers.put(studyId, writer);
             writer.writeHeader(headers.get(studyId));
-            
         }
 
         // actual loop
