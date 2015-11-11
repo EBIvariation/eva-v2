@@ -45,6 +45,10 @@ import java.util.*;
 public class VariantExporter {
 
     private static final Logger logger = LoggerFactory.getLogger(VariantExporter.class);
+    /**
+     * Intended to keep track total failedVariants across several files. To accumulate, use the same instance of
+     * VariantExporter to dump several VCFs. If you just want to count on one VCF, use a `new VariantExporter` each time.
+     */
     private int failedVariants = 0;
 
     /**
@@ -141,12 +145,8 @@ public class VariantExporter {
                 LineIterator sourceFromStream = vcfCodec.makeSourceFromStream(bufferedInputStream);
                 FeatureCodecHeader featureCodecHeader = vcfCodec.readHeader(sourceFromStream);
                 headers.put(source.getStudyId(), (VCFHeader) featureCodecHeader.getHeaderValue());
-            }
-        }
-        
-        for (String studyId : sources.keySet()) {
-            if (!headers.containsKey(studyId)) {
-                throw new IllegalArgumentException("file headers not available for study " + studyId);
+            } else {
+                throw new IllegalArgumentException("file headers not available for study " + source.getStudyId());
             }
         }
 

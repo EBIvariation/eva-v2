@@ -51,6 +51,9 @@ import static org.junit.Assert.assertTrue;
 /**
  * Created by jmmut on 2015-10-29.
  *
+ * TODO:
+ * - test a file with no header, to see how it fails
+ *
  * @author Jose Miguel Mut Lopez &lt;jmmut@ebi.ac.uk&gt;
  */
 public class VariantExporterTest {
