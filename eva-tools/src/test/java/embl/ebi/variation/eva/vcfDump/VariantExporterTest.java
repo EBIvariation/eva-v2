@@ -77,11 +77,12 @@ public class VariantExporterTest {
         VariantDBIterator iterator = variantDBAdaptor.iterator(query);
         VariantSourceDBAdaptor variantSourceDBAdaptor = variantDBAdaptor.getVariantSourceDBAdaptor();
 
-        List<String> outputFiles = VariantExporter.VcfHtsExport(iterator, outputDir, variantSourceDBAdaptor, query);
+        VariantExporter variantExporter = new VariantExporter();
+        List<String> outputFiles = variantExporter.VcfHtsExport(iterator, outputDir, variantSourceDBAdaptor, query);
 
         ////// checks 
         assertEquals(studies.size(), outputFiles.size());
-        assertEquals(0, VariantExporter.getFailedVariants());   // test file should not have failed variants
+        assertEquals(0, variantExporter.getFailedVariants());   // test file should not have failed variants
 
         iterator = variantDBAdaptor.iterator(query);
         assertEqualLinesFilesAndDB(outputFiles, iterator);
@@ -111,12 +112,13 @@ public class VariantExporterTest {
         VariantDBIterator iterator = variantDBAdaptor.iterator(query);
         VariantSourceDBAdaptor variantSourceDBAdaptor = variantDBAdaptor.getVariantSourceDBAdaptor();
 
-        List<String> outputFiles = VariantExporter.VcfHtsExport(iterator, outputDir, variantSourceDBAdaptor, query);
+        VariantExporter variantExporter = new VariantExporter();
+        List<String> outputFiles = variantExporter.VcfHtsExport(iterator, outputDir, variantSourceDBAdaptor, query);
 
         ////////// checks
 
         assertEquals(studies.size(), outputFiles.size());
-        assertEquals(0, VariantExporter.getFailedVariants());
+        assertEquals(0, variantExporter.getFailedVariants());
         
         // for study 7
         query.put(VariantDBAdaptor.STUDIES, Collections.singletonList("7"));
@@ -159,12 +161,13 @@ public class VariantExporterTest {
         VariantDBIterator iterator = variantDBAdaptor.iterator(query);
         VariantSourceDBAdaptor variantSourceDBAdaptor = variantDBAdaptor.getVariantSourceDBAdaptor();
 
-        List<String> outputFiles = VariantExporter.VcfHtsExport(iterator, outputDir, variantSourceDBAdaptor, query);
+        VariantExporter variantExporter = new VariantExporter();
+        List<String> outputFiles = variantExporter.VcfHtsExport(iterator, outputDir, variantSourceDBAdaptor, query);
         
         ////////// checks
 
         assertEquals(studies.size(), outputFiles.size());
-        assertEquals(0, VariantExporter.getFailedVariants());   // test file should not have failed variants
+        assertEquals(0, variantExporter.getFailedVariants());   // test file should not have failed variants
 
         iterator = variantDBAdaptor.iterator(query);
         assertEqualLinesFilesAndDB(outputFiles, iterator);
@@ -233,12 +236,13 @@ public class VariantExporterTest {
         variants = factory.create(variantSource, multiallelicLine);
         assertEquals(2, variants.size());
 
-        variantContext = VariantExporter.convertBiodataVariantToVariantContext(variants.get(0), sources);
+        VariantExporter variantExporter = new VariantExporter();
+        variantContext = variantExporter.convertBiodataVariantToVariantContext(variants.get(0), sources);
         
         alleles = Arrays.asList("C", "A", ".");
         assertEqualGenotypes(variants.get(0), variantContext.get(studyId), alleles);
 
-        variantContext = VariantExporter.convertBiodataVariantToVariantContext(variants.get(1), sources);
+        variantContext = variantExporter.convertBiodataVariantToVariantContext(variants.get(1), sources);
         alleles = Arrays.asList("C", "T", ".");
         assertEqualGenotypes(variants.get(1), variantContext.get(studyId), alleles);
 
@@ -247,7 +251,7 @@ public class VariantExporterTest {
         String indelLine = "1\t1000\tid\tC\tCA\t100\tPASS\t.\tGT\t0|0\t0|0\t0|1\t1|1\t1|0\t0|1";
         variants = factory.create(variantSource, indelLine);
 
-        variantContext = VariantExporter.convertBiodataVariantToVariantContext(variants.get(0), sources);
+        variantContext = variantExporter.convertBiodataVariantToVariantContext(variants.get(0), sources);
         alleles = Arrays.asList("C", "CA");
         assertEqualGenotypes(variants.get(0), variantContext.get(studyId), alleles);
 
@@ -257,11 +261,11 @@ public class VariantExporterTest {
         variants = factory.create(variantSource, multiallelicIndelLine);
         assertEquals(2, variants.size());
 
-        variantContext = VariantExporter.convertBiodataVariantToVariantContext(variants.get(0), sources);
+        variantContext = variantExporter.convertBiodataVariantToVariantContext(variants.get(0), sources);
         alleles = Arrays.asList("C", "CA", ".");
         assertEqualGenotypes(variants.get(0), variantContext.get(studyId), alleles);
 
-        variantContext = VariantExporter.convertBiodataVariantToVariantContext(variants.get(1), sources);
+        variantContext = variantExporter.convertBiodataVariantToVariantContext(variants.get(1), sources);
         alleles = Arrays.asList("C", "T", ".");
         assertEqualGenotypes(variants.get(1), variantContext.get(studyId), alleles);
 

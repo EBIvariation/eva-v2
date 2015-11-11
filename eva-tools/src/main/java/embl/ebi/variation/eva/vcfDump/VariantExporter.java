@@ -45,7 +45,7 @@ import java.util.*;
 public class VariantExporter {
 
     private static final Logger logger = LoggerFactory.getLogger(VariantExporter.class);
-    private static int failedVariants = 0;
+    private int failedVariants = 0;
 
     /**
      *
@@ -55,7 +55,7 @@ public class VariantExporter {
      * @param options not implemented yet, use only for studyId and fileId
      * @return num variants not written due to errors
      */
-    public static List<String> VcfHtsExport(Iterator<Variant> iterator, String outputDir,
+    public List<String> VcfHtsExport(Iterator<Variant> iterator, String outputDir,
                                             VariantSourceDBAdaptor sourceDBAdaptor, QueryOptions options) throws IOException {
 
 
@@ -119,7 +119,7 @@ public class VariantExporter {
         if (failedVariants > 0) {
             logger.warn(failedVariants + " variants were not written due to errors");
         }
-        VariantExporter.failedVariants += failedVariants;
+        this.failedVariants += failedVariants;
 
         for (VariantContextWriter variantContextWriter : writers.values()) {
             variantContextWriter.close();
@@ -128,7 +128,7 @@ public class VariantExporter {
         return files;
     }
 
-    private static Map<String, VCFHeader> getVcfHeaders(Map<String, VariantSource> sources) throws IOException {
+    private Map<String, VCFHeader> getVcfHeaders(Map<String, VariantSource> sources) throws IOException {
 
         Map<String, VCFHeader> headers = new TreeMap<>();
         
@@ -178,11 +178,11 @@ public class VariantExporter {
 
     }
 
-    public static int getFailedVariants() {
+    public int getFailedVariants() {
         return failedVariants;
     }
 
-    private static class VariantFields {
+    class VariantFields {
         public int start;
         public int end;
         public String reference;
@@ -206,7 +206,7 @@ public class VariantExporter {
      * @param variant
      * @return
      */
-    public static Map<String, VariantContext> convertBiodataVariantToVariantContext(
+    public Map<String, VariantContext> convertBiodataVariantToVariantContext(
             Variant variant, Map<String, VariantSource> sources) 
             throws IOException {
 
@@ -303,7 +303,7 @@ public class VariantExporter {
      * @param variantSource
      * @param srcLine  @return
      */
-    private static VariantFields getVariantFields(Variant variant, VariantSource variantSource, String srcLine) {
+    private VariantFields getVariantFields(Variant variant, VariantSource variantSource, String srcLine) {
         String[] split = srcLine.split("\t", 6);
         StringBuilder newLineBuilder = new StringBuilder();
         for (int i = 0; i < split.length - 1; i++) {

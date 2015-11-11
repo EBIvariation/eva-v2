@@ -65,6 +65,6 @@ public class DumpMain {
         VariantDBIterator iterator = variantDBAdaptor.iterator(query);
         VariantSourceDBAdaptor variantSourceDBAdaptor = variantDBAdaptor.getVariantSourceDBAdaptor();
 
-        List<String> fileNames = VariantExporter.VcfHtsExport(iterator, outputDir, variantSourceDBAdaptor, query);
+        List<String> fileNames = new VariantExporter().VcfHtsExport(iterator, outputDir, variantSourceDBAdaptor, query);
     }
 }
