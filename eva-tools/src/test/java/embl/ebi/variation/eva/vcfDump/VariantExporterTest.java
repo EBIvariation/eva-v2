@@ -22,11 +22,10 @@ import htsjdk.variant.variantcontext.Genotype;
 import htsjdk.variant.variantcontext.VariantContext;
 import org.junit.AfterClass;
 import org.junit.BeforeClass;
+import org.junit.Rule;
 import org.junit.Test;
-import org.opencb.biodata.models.variant.Variant;
-import org.opencb.biodata.models.variant.VariantFactory;
-import org.opencb.biodata.models.variant.VariantSource;
-import org.opencb.biodata.models.variant.VariantVcfFactory;
+import org.junit.rules.ExpectedException;
+import org.opencb.biodata.models.variant.*;
 import org.opencb.biodata.models.variant.stats.VariantSourceStats;
 import org.opencb.datastore.core.QueryOptions;
 import org.opencb.datastore.core.QueryResult;
@@ -50,16 +49,16 @@ import static org.junit.Assert.assertTrue;
 
 /**
  * Created by jmmut on 2015-10-29.
- *
- * TODO:
- * - test a file with no header, to see how it fails
- *
+ * 
  * @author Jose Miguel Mut Lopez &lt;jmmut@ebi.ac.uk&gt;
  */
 public class VariantExporterTest {
     private static final String DB_NAME = "VariantExporterTest";
 
     private static final Logger logger = LoggerFactory.getLogger(VariantExporterTest.class);
+
+    @Rule
+    public ExpectedException thrown = ExpectedException.none();
 
     @Test
     public void testVcfHtsExport() throws Exception {
@@ -178,6 +177,87 @@ public class VariantExporterTest {
         for (String outputFile : outputFiles) {
             boolean delete = new File(outputFile).delete();
             assertTrue(delete);
+        }
+    }
+
+    @Test
+    public void testMissingStudy() throws Exception {
+
+        Config.setOpenCGAHome(System.getenv("OPENCGA_HOME") != null ? System.getenv("OPENCGA_HOME") : "/opt/opencga");
+
+        QueryOptions query = new QueryOptions();
+        List<String> files = Arrays.asList("5");
+        List<String> studies = Arrays.asList("7", "9"); // study 9 doesn't exist
+        query.put(VariantDBAdaptor.FILES, files);
+        query.put(VariantDBAdaptor.STUDIES, studies);
+        String outputDir = "/tmp/";
+
+        VariantStorageManager variantStorageManager = StorageManagerFactory.getVariantStorageManager();
+        VariantDBAdaptor variantDBAdaptor = variantStorageManager.getDBAdaptor(DB_NAME, null);
+        VariantDBIterator iterator = variantDBAdaptor.iterator(query);
+        VariantSourceDBAdaptor variantSourceDBAdaptor = variantDBAdaptor.getVariantSourceDBAdaptor();
+
+        VariantExporter variantExporter = new VariantExporter();
+
+        thrown.expect(IllegalArgumentException.class);  // comment this line to see the actual exception, making the test fail
+        variantExporter.VcfHtsExport(iterator, outputDir, variantSourceDBAdaptor, query);
+    }
+
+    @Test
+    public void testMissingSrc() throws Exception {
+
+        final VariantSource variantSource = new VariantSource("name", "fileId", "studyId", "studyName");
+        List<String> samples = new ArrayList<>();
+        for (int i = 0; i < 6; i++) {
+            samples.add("s"+i);
+        }
+        variantSource.setSamples(samples);
+        VariantFactory factory = new VariantVcfFactory();
+        Map<String, VariantSource> sources = Collections.singletonMap(variantSource.getStudyId(), variantSource);
+        QueryOptions options = new QueryOptions("fileId", "fileId");
+        String studyId = "studyId";
+        options.add("studyId", studyId);
+        List<Variant> variants;
+        Map<String, VariantContext> variantContext;
+        List<String> alleles;
+
+        // test multiallelic. these first conversions should NOT fail, as they doesn't need the src
+        String multiallelicLine = "1\t1000\tid\tC\tA,T\t100\tPASS\t.\tGT\t0|0\t0|0\t0|1\t1|1\t1|2\t0|1";
+        variants = factory.create(variantSource, multiallelicLine);
+        assertEquals(2, variants.size());
+        removeSrc(variants);    // <---- this is the key point of the test
+
+        VariantExporter variantExporter = new VariantExporter();
+        variantContext = variantExporter.convertBiodataVariantToVariantContext(variants.get(0), sources);
+
+        alleles = Arrays.asList("C", "A", ".");
+        assertEqualGenotypes(variants.get(0), variantContext.get(studyId), alleles);
+
+        variantContext = variantExporter.convertBiodataVariantToVariantContext(variants.get(1), sources);
+        alleles = Arrays.asList("C", "T", ".");
+        assertEqualGenotypes(variants.get(1), variantContext.get(studyId), alleles);
+
+        // test multiallelic + indel
+        String multiallelicIndelLine = "1\t1000\tid\tC\tCA,T\t100\tPASS\t.\tGT\t0|0\t0|0\t0|1\t1|1\t1|2\t0|1";
+        variants = factory.create(variantSource, multiallelicIndelLine);
+        assertEquals(2, variants.size());
+        removeSrc(variants);    // <---- this is the key point of the test
+
+        variantContext = variantExporter.convertBiodataVariantToVariantContext(variants.get(1), sources);
+        alleles = Arrays.asList("C", "T", ".");
+        assertEqualGenotypes(variants.get(1), variantContext.get(studyId), alleles);
+
+        // the next conversion is the only one that should throw
+        thrown.expect(IllegalArgumentException.class);
+        variantExporter.convertBiodataVariantToVariantContext(variants.get(0), sources);
+
+    }
+
+    private void removeSrc(List<Variant> variants) {
+        for (Variant variant : variants) {
+            for (VariantSourceEntry variantSourceEntry : variant.getSourceEntries().values()) {
+                variantSourceEntry.getAttributes().remove("src");
+            }
         }
     }
 
