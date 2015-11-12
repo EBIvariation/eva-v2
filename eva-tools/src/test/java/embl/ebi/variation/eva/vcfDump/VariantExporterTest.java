@@ -26,9 +26,7 @@ import org.junit.Rule;
 import org.junit.Test;
 import org.junit.rules.ExpectedException;
 import org.opencb.biodata.models.variant.*;
-import org.opencb.biodata.models.variant.stats.VariantSourceStats;
 import org.opencb.datastore.core.QueryOptions;
-import org.opencb.datastore.core.QueryResult;
 import org.opencb.opencga.lib.common.Config;
 import org.opencb.opencga.storage.core.StorageManagerFactory;
 import org.opencb.opencga.storage.core.variant.VariantStorageManager;
@@ -42,7 +40,6 @@ import java.io.*;
 import java.net.UnknownHostException;
 import java.util.*;
 import java.util.zip.GZIPInputStream;
-import java.util.zip.GZIPOutputStream;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertTrue;
@@ -62,7 +59,6 @@ public class VariantExporterTest {
 
     @Test
     public void testVcfHtsExport() throws Exception {
-
         Config.setOpenCGAHome(System.getenv("OPENCGA_HOME") != null ? System.getenv("OPENCGA_HOME") : "/opt/opencga");
 
         QueryOptions query = new QueryOptions();
@@ -72,7 +68,6 @@ public class VariantExporterTest {
         query.put(VariantDBAdaptor.FILES, files);
         query.put(VariantDBAdaptor.STUDIES, studies);
         String outputDir = "/tmp/";
-
 
         VariantStorageManager variantStorageManager = StorageManagerFactory.getVariantStorageManager();
         VariantDBAdaptor variantDBAdaptor = variantStorageManager.getDBAdaptor(DB_NAME, null);
@@ -97,7 +92,6 @@ public class VariantExporterTest {
     
     @Test
     public void testVcfHtsExportSeveralStudies() throws Exception {
-
         Config.setOpenCGAHome(System.getenv("OPENCGA_HOME") != null ? System.getenv("OPENCGA_HOME") : "/opt/opencga");
 
         QueryOptions query = new QueryOptions();
@@ -138,11 +132,9 @@ public class VariantExporterTest {
             assertTrue(delete);
         }
     }
-
     
     @Test
     public void testFilter() throws Exception {
-
         Config.setOpenCGAHome(System.getenv("OPENCGA_HOME") != null ? System.getenv("OPENCGA_HOME") : "/opt/opencga");
 
         QueryOptions query = new QueryOptions();
@@ -182,7 +174,6 @@ public class VariantExporterTest {
 
     @Test
     public void testMissingStudy() throws Exception {
-
         Config.setOpenCGAHome(System.getenv("OPENCGA_HOME") != null ? System.getenv("OPENCGA_HOME") : "/opt/opencga");
 
         QueryOptions query = new QueryOptions();
@@ -205,7 +196,6 @@ public class VariantExporterTest {
 
     @Test
     public void testMissingSrc() throws Exception {
-
         final VariantSource variantSource = new VariantSource("name", "fileId", "studyId", "studyName");
         List<String> samples = new ArrayList<>();
         for (int i = 0; i < 6; i++) {
@@ -251,50 +241,6 @@ public class VariantExporterTest {
         thrown.expect(IllegalArgumentException.class);
         variantExporter.convertBiodataVariantToVariantContext(variants.get(0), sources);
 
-    }
-
-    private void removeSrc(List<Variant> variants) {
-        for (Variant variant : variants) {
-            for (VariantSourceEntry variantSourceEntry : variant.getSourceEntries().values()) {
-                variantSourceEntry.getAttributes().remove("src");
-            }
-        }
-    }
-
-    private void assertEqualLinesFilesAndDB(List<String> fileNames, VariantDBIterator iterator) throws IOException {
-
-        long lines = 0;
-        for (String fileName : fileNames) {
-            lines += countLines(fileName);
-        }
-
-        // counting variants in the DB
-        long variantRows = countRows(iterator);
-
-        assertEquals(variantRows, lines);
-    }
-
-    private long countRows(Iterator<Variant> iterator) {
-        int variantRows = 0;
-        while(iterator.hasNext()) {
-            iterator.next();
-            variantRows++;
-        }
-        return variantRows;
-    }
-
-    private long countLines(String fileName) throws IOException {
-        long lines;
-        lines = 0;
-        BufferedReader file = new BufferedReader(new InputStreamReader(new GZIPInputStream(new FileInputStream(fileName))));
-        String line;
-        while ((line = file.readLine()) != null) {
-            if (line.charAt(0) != '#') {
-                lines++;
-            }
-        }
-        file.close();
-        return lines;
     }
 
     @Test
@@ -354,31 +300,28 @@ public class VariantExporterTest {
 
     }
 
-    private void assertEqualGenotypes(Variant variant, VariantContext variantContext, List<String> alleles) {
-        for (Map.Entry<String, Map<String, String>> data : variant.getSourceEntries().values().iterator().next().getSamplesData().entrySet()) {
-            Genotype genotype = variantContext.getGenotype(data.getKey());
-            String gt = data.getValue().get("GT");
-            org.opencb.biodata.models.feature.Genotype biodataGenotype = new org.opencb.biodata.models.feature.Genotype(gt, alleles.get(0), alleles.get(1));
-            assertEquals(Allele.create(alleles.get(biodataGenotype.getAllele(0)), biodataGenotype.isAlleleRef(0)),
-                    genotype.getAllele(0));
-            assertEquals(Allele.create(alleles.get(biodataGenotype.getAllele(1)), biodataGenotype.isAlleleRef(1)),
-                    genotype.getAllele(1));
-        }
-    }
-
+    /**
+     * Clears and populates the Mongo collection used during the tests.
+     * @throws java.io.IOException
+     * @throws java.lang.InterruptedException
+     */
     @BeforeClass
-    public static void beforeTests() throws IOException, InterruptedException {
+    public static void setUpClass() throws IOException, InterruptedException {
         cleanDBs();
         fillDB();
     }
 
+    /**
+     * Clears and populates the Mongo collection used during the tests.
+     * 
+     * @throws UnknownHostException 
+     */
     @AfterClass
-    public static void afterTests() throws UnknownHostException {
+    public static void tearDownClass() throws UnknownHostException {
         cleanDBs();
     }
 
     private static void cleanDBs() throws UnknownHostException {
-        // Delete Mongo collection
         MongoClient mongoClient = new MongoClient("localhost");
         List<String> dbs = Arrays.asList(DB_NAME);
         for (String dbName : dbs) {
@@ -388,7 +331,7 @@ public class VariantExporterTest {
         mongoClient.close();
     }
 
-    public static void fillDB() throws IOException, InterruptedException {
+    private static void fillDB() throws IOException, InterruptedException {
         String dump = VariantExporterTest.class.getResource("/dump/").getFile();
         logger.info("restoring DB from " + dump);
         Process exec = Runtime.getRuntime().exec("mongorestore " + dump);
@@ -407,4 +350,60 @@ public class VariantExporterTest {
 
         logger.info("mongorestore exit value: " + exec.exitValue());
     }
+    
+    private void removeSrc(List<Variant> variants) {
+        for (Variant variant : variants) {
+            for (VariantSourceEntry variantSourceEntry : variant.getSourceEntries().values()) {
+                variantSourceEntry.getAttributes().remove("src");
+            }
+        }
+    }
+
+    private void assertEqualLinesFilesAndDB(List<String> fileNames, VariantDBIterator iterator) throws IOException {
+        long lines = 0;
+        for (String fileName : fileNames) {
+            lines += countLines(fileName);
+        }
+
+        // counting variants in the DB
+        long variantRows = countRows(iterator);
+
+        assertEquals(variantRows, lines);
+    }
+
+    private long countRows(Iterator<Variant> iterator) {
+        int variantRows = 0;
+        while(iterator.hasNext()) {
+            iterator.next();
+            variantRows++;
+        }
+        return variantRows;
+    }
+
+    private long countLines(String fileName) throws IOException {
+        long lines;
+        lines = 0;
+        BufferedReader file = new BufferedReader(new InputStreamReader(new GZIPInputStream(new FileInputStream(fileName))));
+        String line;
+        while ((line = file.readLine()) != null) {
+            if (line.charAt(0) != '#') {
+                lines++;
+            }
+        }
+        file.close();
+        return lines;
+    }
+
+    private void assertEqualGenotypes(Variant variant, VariantContext variantContext, List<String> alleles) {
+        for (Map.Entry<String, Map<String, String>> data : variant.getSourceEntries().values().iterator().next().getSamplesData().entrySet()) {
+            Genotype genotype = variantContext.getGenotype(data.getKey());
+            String gt = data.getValue().get("GT");
+            org.opencb.biodata.models.feature.Genotype biodataGenotype = new org.opencb.biodata.models.feature.Genotype(gt, alleles.get(0), alleles.get(1));
+            assertEquals(Allele.create(alleles.get(biodataGenotype.getAllele(0)), biodataGenotype.isAlleleRef(0)),
+                    genotype.getAllele(0));
+            assertEquals(Allele.create(alleles.get(biodataGenotype.getAllele(1)), biodataGenotype.isAlleleRef(1)),
+                    genotype.getAllele(1));
+        }
+    }
+
 }

@@ -46,24 +46,27 @@ import java.util.*;
 public class VariantExporter {
 
     private static final Logger logger = LoggerFactory.getLogger(VariantExporter.class);
+    
     /**
-     * Read only. Intended to keep track total failedVariants across several files. To accumulate, use the same instance of
-     * VariantExporter to dump several VCFs. If you just want to count on one VCF, use a `new VariantExporter` each time.
+     * Read only. Keeps track of the total failed variants across several dumps. To accumulate, use the same instance of
+     * VariantExporter to dump several VCFs. If you just want to count on one dump, use a `new VariantExporter` each time.
      */
     private int failedVariants = 0;
 
     /**
-     *
+     * Entry point to the export functionality. It generates one VCF file per requested study,
+     * writing both the header meta-data and the variants in the body.
+     * 
      * @param iterator where to get the variants from
-     * @param outputDir directory to write the output vcf(s).
-     * @param sourceDBAdaptor to retrieve all the VariantSources in any VariantSourceEntry.
+     * @param outputDir directory to write the output vcf(s) to
+     * @param sourceDBAdaptor to retrieve all the VariantSources in any VariantSourceEntry
      * @param options not implemented yet, use only for studyId and fileId
-     * @return num variants not written due to errors
+     * @return number of variants not written due to errors
      */
     public List<String> VcfHtsExport(Iterator<Variant> iterator, String outputDir,
                                      VariantSourceDBAdaptor sourceDBAdaptor, QueryOptions options) throws IOException {
 
-        // 3 steps to get the headers of all the studyIds: ask VariantSources to sourceAdaptor, check we got everyone, build the headers.
+        // 3 steps to get the headers of all the studyIds: ask the sourceAdaptor for VariantSources, check we got everything, build the headers.
         List<String> studyIds = options.getAsStringList(VariantDBAdaptor.STUDIES);
 
         // 1) retrieve the sources
@@ -76,7 +79,7 @@ public class VariantExporter {
         // 2) check that sourceDBAdaptor got all the studyIds
         for (String studyId : studyIds) {
             if (!sources.containsKey(studyId)) {
-                throw new IllegalArgumentException("aborting VCF export: missing header for study " + studyId);
+                throw new IllegalArgumentException("Aborting VCF export: missing header for study " + studyId);
             }
         }
 
@@ -103,10 +106,10 @@ public class VariantExporter {
             writer.writeHeader(headers.get(studyId));
         }
 
-        // actual loop
-        int failedVariants = 0;
         logger.info("Exporting to files: [" + StringUtils.join(files, " ") + "]");
 
+        // actual loop
+        int failedVariants = 0;
         while (iterator.hasNext()) {
             Variant variant = iterator.next();
             try {
@@ -117,7 +120,7 @@ public class VariantExporter {
                     }
                 }
             } catch (Exception e) {
-                logger.info("failed variant: ", e);
+                logger.info("Variant dump failed", e);
                 failedVariants++;
             }
         }
@@ -140,7 +143,6 @@ public class VariantExporter {
      * @throws IOException
      */
     private Map<String, VCFHeader> getVcfHeaders(Map<String, VariantSource> sources) throws IOException {
-
         Map<String, VCFHeader> headers = new TreeMap<>();
         
         for (VariantSource source : sources.values()) {
@@ -153,7 +155,7 @@ public class VariantExporter {
                 FeatureCodecHeader featureCodecHeader = vcfCodec.readHeader(sourceFromStream);
                 headers.put(source.getStudyId(), (VCFHeader) featureCodecHeader.getHeaderValue());
             } else {
-                throw new IllegalArgumentException("file headers not available for study " + source.getStudyId());
+                throw new IllegalArgumentException("File headers not available for study " + source.getStudyId());
             }
         }
 
@@ -217,9 +219,7 @@ public class VariantExporter {
      * @return
      */
     public Map<String, VariantContext> convertBiodataVariantToVariantContext(
-            Variant variant, Map<String, VariantSource> sources) 
-            throws IOException {
-
+            Variant variant, Map<String, VariantSource> sources) throws IOException {
         int missingGenotypes = 0;
         Set<String> studyIds = sources.keySet();
         Map<String, VariantContext> variantContextMap = new TreeMap<>();
@@ -260,7 +260,7 @@ public class VariantExporter {
                         VariantSource variantSource = sources.get(studyId);
                         if (variantSource == null) {
                             throw new IllegalArgumentException(String.format(
-                                    "VariantSource not available for study %s, needed in variant %s_%d_%s_%s", studyId,
+                                    "VariantSource not available for study %s, needed in variant %s:%d:%s>%s", studyId,
                                     variant.getChromosome(), variant.getStart(), variant.getReference(), variant.getAlternate()));
                         }
                         VariantFields variantFields = getVariantFields(variant, variantSource, src);
@@ -299,10 +299,9 @@ public class VariantExporter {
             }
         }
 
-        if (missingGenotypes != 0) {
-            logger.info("In variant %s_%d_%s_%s there were %d missing genotypes (they will be printed as \"./.\"). " +
-                            "A lot of missings could be a hint that something is wrong", variant.getChromosome(),
-                    variant.getStart(), variant.getReference(), variant.getAlternate());
+        if (missingGenotypes > 0) {
+            logger.info("Variant %s:%d:%s>%s lacked the GT field in %d genotypes (they will be printed as \"./.\").", 
+                    variant.getChromosome(), variant.getStart(), variant.getReference(), variant.getAlternate());
         }
 
         for (Map.Entry<String, List<Genotype>> studyEntry : genotypesPerStudy.entrySet()) {
@@ -321,10 +320,12 @@ public class VariantExporter {
     }
 
     /**
-     * In case there is an INDEL (multiallelic or not), we have to retrieve the alleles from the original vcf line.
-     * @param variant
-     * @param variantSource
-     * @param srcLine  @return
+     * In case there is an INDEL (multiallelic or not), we have to retrieve the alleles from the original VCF line.
+     * 
+     * @param variant the variant as available in the variant store
+     * @param variantSource VCF file meta-data as available in the variant store
+     * @param srcLine the original VCF line as available in the variant store
+     * @return the variant coordinates and alleles to write as output
      */
     private VariantFields getVariantFields(Variant variant, VariantSource variantSource, String srcLine) {
         String[] split = srcLine.split("\t", 6);
@@ -348,7 +349,7 @@ public class VariantExporter {
         String[] alts = split[4].split(",");
         if (alleleNumber >= alts.length) {
             throw new IllegalArgumentException(String.format(
-                    "Variant \"%s_%s_%s_%s\" has empty alleles and no original line",
+                    "Variant %s:%d:%s>%s has empty alleles and no original VCF line stored",
                     variant.getChromosome(), variant.getStart(), variant.getReference(), variant.getAlternate()));
         }
 
@@ -358,7 +359,7 @@ public class VariantExporter {
         variantFields.start = Integer.parseInt(split[1]);
         variantFields.end = variantFields.start + variantFields.reference.length()-1;
 
-        logger.debug("Using original alleles from vcf line in \"{}_{}_{}_{}\". Original ref and alts: \"{}:{}\". Output: \"{}:{}\"",
+        logger.debug("Using alleles from original VCF line in {}:{}:{}>{}. Original REF and ALT: \"{}>{}\". Output: \"{}>{}\"",
                 variant.getChromosome(), variant.getStart(), variant.getReference(), variant.getAlternate(),
                 variantFields.reference, StringUtils.join(alts, ","),
                 variantFields.reference, variantFields.alternate);
