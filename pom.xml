@@ -17,6 +17,7 @@
 
     <modules>
         <module>eva-pipeline</module>
+        <module>eva-tools</module>
         <!-- <module>eva-data-access</module> -->
     </modules>
 
