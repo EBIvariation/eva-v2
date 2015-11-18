@@ -15,6 +15,7 @@
  */
 package embl.ebi.variation.eva.vcfDump;
 
+import htsjdk.samtools.SAMSequenceDictionary;
 import htsjdk.tribble.FeatureCodecHeader;
 import htsjdk.tribble.readers.LineIterator;
 import htsjdk.variant.variantcontext.*;
@@ -22,6 +23,7 @@ import htsjdk.variant.variantcontext.writer.Options;
 import htsjdk.variant.variantcontext.writer.VariantContextWriter;
 import htsjdk.variant.variantcontext.writer.VariantContextWriterBuilder;
 import htsjdk.variant.vcf.VCFCodec;
+import htsjdk.variant.vcf.VCFFilterHeaderLine;
 import htsjdk.variant.vcf.VCFHeader;
 import org.apache.commons.lang.StringUtils;
 import org.opencb.biodata.models.variant.*;
@@ -97,9 +99,15 @@ public class VariantExporter {
             VariantContextWriterBuilder builder = new VariantContextWriterBuilder();
             File outFile = Paths.get(outputDir).resolve(studyId + suffix).toFile();
             files.add(outFile.getPath());
+            SAMSequenceDictionary sequenceDictionary;
+            try {
+                sequenceDictionary = headers.get(studyId).getSequenceDictionary();
+            } catch (Exception e) {
+                sequenceDictionary = null;
+            }
             VariantContextWriter writer = builder
                     .setOutputFile(outFile)
-                    .setReferenceDictionary(headers.get(studyId).getSequenceDictionary())
+                    .setReferenceDictionary(sequenceDictionary)
                     .unsetOption(Options.INDEX_ON_THE_FLY)
                     .build();
             writers.put(studyId, writer);
@@ -153,7 +161,9 @@ public class VariantExporter {
                 ByteArrayInputStream bufferedInputStream = new ByteArrayInputStream(((String) headerObject).getBytes());
                 LineIterator sourceFromStream = vcfCodec.makeSourceFromStream(bufferedInputStream);
                 FeatureCodecHeader featureCodecHeader = vcfCodec.readHeader(sourceFromStream);
-                headers.put(source.getStudyId(), (VCFHeader) featureCodecHeader.getHeaderValue());
+                VCFHeader headerValue = (VCFHeader) featureCodecHeader.getHeaderValue();
+                headerValue.addMetaDataLine(new VCFFilterHeaderLine("PASS", "Valid variant"));
+                headers.put(source.getStudyId(), headerValue);
             } else {
                 throw new IllegalArgumentException("File headers not available for study " + source.getStudyId());
             }
@@ -162,7 +172,7 @@ public class VariantExporter {
         return headers;
         //TODO: allow specify which samples to return
 /*
-//        header.addMetaDataLine(new VCFFilterHeaderLine("PASS", "Valid variant"));
+//
 //        header.addMetaDataLine(new VCFFilterHeaderLine(".", "No FILTER info"));
 
 //        List<String> returnedSamples = new ArrayList<>();
