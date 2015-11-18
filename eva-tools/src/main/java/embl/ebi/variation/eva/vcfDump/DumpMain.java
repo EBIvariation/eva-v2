@@ -51,11 +51,21 @@ public class DumpMain {
         Config.setOpenCGAHome(System.getenv("OPENCGA_HOME") != null ? System.getenv("OPENCGA_HOME") : "/opt/opencga");
 
         QueryOptions query = new QueryOptions();
-        List<String> files = Arrays.asList("5");
-        List<String> studies = Arrays.asList("7");
-        String dbName = "batch";
-        String outputDir = "./";
+        List<String> files;         // = Arrays.asList("5");
+        List<String> studies;       // = Arrays.asList("7");
+        String dbName;              // = "batch";
+        String outputDir;           // = "./";
 
+        if (args.length == 4) {
+            dbName = args[0];
+            studies = Arrays.asList(args[1].split(","));
+            files = Arrays.asList(args[2].split(","));
+            outputDir = args[3];
+        } else {
+            System.out.println("usage: java -jar <jar> <dbName> <studies CommaSeparatedValues> <files CSV> <output directory>");
+            System.out.println("example: java -jar eva-tools-0.1.jar batch 7 5,6 ./");
+            return;
+        }
         query.put(VariantDBAdaptor.FILES, files);
         query.put(VariantDBAdaptor.STUDIES, studies);
 
