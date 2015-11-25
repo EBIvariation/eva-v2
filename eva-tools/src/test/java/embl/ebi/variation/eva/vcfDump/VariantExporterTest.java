@@ -26,6 +26,7 @@ import org.junit.Rule;
 import org.junit.Test;
 import org.junit.rules.ExpectedException;
 import org.opencb.biodata.models.variant.*;
+import org.opencb.cellbase.core.client.CellBaseClient;
 import org.opencb.datastore.core.QueryOptions;
 import org.opencb.opencga.lib.common.Config;
 import org.opencb.opencga.storage.core.StorageManagerFactory;
@@ -37,6 +38,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.*;
+import java.net.URI;
 import java.net.UnknownHostException;
 import java.util.*;
 import java.util.zip.GZIPInputStream;
@@ -73,8 +75,13 @@ public class VariantExporterTest {
         VariantDBAdaptor variantDBAdaptor = variantStorageManager.getDBAdaptor(DB_NAME, null);
         VariantDBIterator iterator = variantDBAdaptor.iterator(query);
         VariantSourceDBAdaptor variantSourceDBAdaptor = variantDBAdaptor.getVariantSourceDBAdaptor();
+        String url = (String) Config.getStorageProperties().get("CELLBASE.REST.URL");
+        String version = (String) Config.getStorageProperties().get("CELLBASE.VERSION");
 
-        VariantExporter variantExporter = new VariantExporter();
+
+        CellBaseClient cellBaseClient = new CellBaseClient(new URI(url), version, "hsapiens");
+
+        VariantExporter variantExporter = new VariantExporter(cellBaseClient);
         List<String> outputFiles = variantExporter.VcfHtsExport(iterator, outputDir, variantSourceDBAdaptor, query);
 
         ////// checks 
@@ -107,8 +114,14 @@ public class VariantExporterTest {
         VariantDBAdaptor variantDBAdaptor = variantStorageManager.getDBAdaptor(DB_NAME, null);
         VariantDBIterator iterator = variantDBAdaptor.iterator(query);
         VariantSourceDBAdaptor variantSourceDBAdaptor = variantDBAdaptor.getVariantSourceDBAdaptor();
+        String url = (String) Config.getStorageProperties().get("CELLBASE.REST.URL");
+        String version = (String) Config.getStorageProperties().get("CELLBASE.VERSION");
 
-        VariantExporter variantExporter = new VariantExporter();
+
+        CellBaseClient cellBaseClient = new CellBaseClient(new URI(url), version, "hsapiens");
+
+
+        VariantExporter variantExporter = new VariantExporter(cellBaseClient);
         List<String> outputFiles = variantExporter.VcfHtsExport(iterator, outputDir, variantSourceDBAdaptor, query);
 
         ////////// checks
@@ -154,8 +167,14 @@ public class VariantExporterTest {
         VariantDBAdaptor variantDBAdaptor = variantStorageManager.getDBAdaptor(DB_NAME, null);
         VariantDBIterator iterator = variantDBAdaptor.iterator(query);
         VariantSourceDBAdaptor variantSourceDBAdaptor = variantDBAdaptor.getVariantSourceDBAdaptor();
+        String url = (String) Config.getStorageProperties().get("CELLBASE.REST.URL");
+        String version = (String) Config.getStorageProperties().get("CELLBASE.VERSION");
 
-        VariantExporter variantExporter = new VariantExporter();
+
+        CellBaseClient cellBaseClient = new CellBaseClient(new URI(url), version, "hsapiens");
+
+
+        VariantExporter variantExporter = new VariantExporter(cellBaseClient);
         List<String> outputFiles = variantExporter.VcfHtsExport(iterator, outputDir, variantSourceDBAdaptor, query);
         
         ////////// checks
@@ -187,15 +206,21 @@ public class VariantExporterTest {
         VariantDBAdaptor variantDBAdaptor = variantStorageManager.getDBAdaptor(DB_NAME, null);
         VariantDBIterator iterator = variantDBAdaptor.iterator(query);
         VariantSourceDBAdaptor variantSourceDBAdaptor = variantDBAdaptor.getVariantSourceDBAdaptor();
+        String url = (String) Config.getStorageProperties().get("CELLBASE.REST.URL");
+        String version = (String) Config.getStorageProperties().get("CELLBASE.VERSION");
 
-        VariantExporter variantExporter = new VariantExporter();
+
+        CellBaseClient cellBaseClient = new CellBaseClient(new URI(url), version, "hsapiens");
+
+
+        VariantExporter variantExporter = new VariantExporter(cellBaseClient);
 
         thrown.expect(IllegalArgumentException.class);  // comment this line to see the actual exception, making the test fail
         variantExporter.VcfHtsExport(iterator, outputDir, variantSourceDBAdaptor, query);
     }
 
     @Test
-    public void testMissingSrc() throws Exception {
+    public void testMissingCellbase() throws Exception {
         final VariantSource variantSource = new VariantSource("name", "fileId", "studyId", "studyName");
         List<String> samples = new ArrayList<>();
         for (int i = 0; i < 6; i++) {
@@ -217,7 +242,7 @@ public class VariantExporterTest {
         assertEquals(2, variants.size());
         removeSrc(variants);    // <---- this is the key point of the test
 
-        VariantExporter variantExporter = new VariantExporter();
+        VariantExporter variantExporter = new VariantExporter(null);
         variantContext = variantExporter.convertBiodataVariantToVariantContext(variants.get(0), sources);
 
         alleles = Arrays.asList("C", "A", ".");
@@ -248,7 +273,7 @@ public class VariantExporterTest {
         final VariantSource variantSource = new VariantSource("name", "fileId", "studyId", "studyName");
         List<String> samples = new ArrayList<>();
         for (int i = 0; i < 6; i++) {
-            samples.add("s"+i);
+            samples.add("s" + i);
         }
         variantSource.setSamples(samples);
         VariantFactory factory = new VariantVcfFactory();
@@ -259,13 +284,19 @@ public class VariantExporterTest {
         List<Variant> variants;
         Map<String, VariantContext> variantContext;
         List<String> alleles;
+        String url = (String) Config.getStorageProperties().get("CELLBASE.REST.URL");
+        String version = (String) Config.getStorageProperties().get("CELLBASE.VERSION");
+
+
+        CellBaseClient cellBaseClient = new CellBaseClient(new URI(url), version, "hsapiens");
+
 
         // test multiallelic
         String multiallelicLine = "1\t1000\tid\tC\tA,T\t100\tPASS\t.\tGT\t0|0\t0|0\t0|1\t1|1\t1|2\t0|1";
         variants = factory.create(variantSource, multiallelicLine);
         assertEquals(2, variants.size());
 
-        VariantExporter variantExporter = new VariantExporter();
+        VariantExporter variantExporter = new VariantExporter(cellBaseClient);
         variantContext = variantExporter.convertBiodataVariantToVariantContext(variants.get(0), sources);
         
         alleles = Arrays.asList("C", "A", ".");
