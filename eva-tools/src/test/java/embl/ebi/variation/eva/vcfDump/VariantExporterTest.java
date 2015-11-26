@@ -308,25 +308,25 @@ public class VariantExporterTest {
 
 
         // test indel
-        String indelLine = "1\t1000\tid\tC\tCA\t100\tPASS\t.\tGT\t0|0\t0|0\t0|1\t1|1\t1|0\t0|1";
+        String indelLine = "1\t1000\tid\tN\tNA\t100\tPASS\t.\tGT\t0|0\t0|0\t0|1\t1|1\t1|0\t0|1";
         variants = factory.create(variantSource, indelLine);
 
         variantContext = variantExporter.convertBiodataVariantToVariantContext(variants.get(0), sources);
-        alleles = Arrays.asList("C", "CA");
+        alleles = Arrays.asList("N", "NA");
         assertEqualGenotypes(variants.get(0), variantContext.get(studyId), alleles);
 
 
         // test multiallelic + indel
-        String multiallelicIndelLine = "1\t1000\tid\tC\tCA,T\t100\tPASS\t.\tGT\t0|0\t0|0\t0|1\t1|1\t1|2\t0|1";
+        String multiallelicIndelLine = "1\t1000\tid\tN\tNA,T\t100\tPASS\t.\tGT\t0|0\t0|0\t0|1\t1|1\t1|2\t0|1";
         variants = factory.create(variantSource, multiallelicIndelLine);
         assertEquals(2, variants.size());
 
         variantContext = variantExporter.convertBiodataVariantToVariantContext(variants.get(0), sources);
-        alleles = Arrays.asList("C", "CA", ".");
+        alleles = Arrays.asList("N", "NA", ".");
         assertEqualGenotypes(variants.get(0), variantContext.get(studyId), alleles);
 
         variantContext = variantExporter.convertBiodataVariantToVariantContext(variants.get(1), sources);
-        alleles = Arrays.asList("C", "T", ".");
+        alleles = Arrays.asList("N", "T", ".");
         assertEqualGenotypes(variants.get(1), variantContext.get(studyId), alleles);
 
     }

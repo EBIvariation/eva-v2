@@ -148,7 +148,9 @@ public class VariantExporter {
                     }
                 }
             } catch (Exception e) {
-                logger.info("Variant dump failed", e);
+                logger.info(String.format("Variant dump failed: \"%s:%d:%s>%s\"", variant.getChromosome(),
+                                variant.getStart(), variant.getReference(), variant.getAlternate()),
+                        e);
                 failedVariants++;
             }
         }
@@ -297,26 +299,8 @@ public class VariantExporter {
                             allelesArray = new ArrayList<>();
                             allelesArray.add(response.get(0).getSequence() + reference);
                             allelesArray.add(response.get(0).getSequence() + alternate);
+                            end = start + allelesArray.get(0).length()-1;   // -1 because end is inclusive. [start, end] instead of [start, end)
                         }
-                         /*
-                        String src = source.getAttribute("src");
-                        if (src != null) {
-                            VariantSource variantSource = sources.get(studyId);
-                            if (variantSource == null) {
-                                throw new IllegalArgumentException(String.format(
-                                        "VariantSource not available for study %s, needed in variant %s:%d:%s>%s", studyId,
-                                        variant.getChromosome(), variant.getStart(), variant.getReference(), variant.getAlternate()));
-                            }
-                            VariantFields variantFields = getVariantFields(variant, variantSource, src);
-
-                            // overwrite the initial-guess position and alleles
-                            allelesArray = new ArrayList<>();
-                            allelesArray.add(variantFields.reference);
-                            allelesArray.add(variantFields.alternate);
-                            start = variantFields.start;
-                            end = variantFields.end;
-                        }
-    //                        */
                     } else {
                         throw new IllegalArgumentException(String.format(
                                         "CellBase was not provided, needed to fill empty alleles at study %s, in variant %s:%d:%s>%s", studyId,

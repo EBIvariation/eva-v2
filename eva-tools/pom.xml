@@ -11,7 +11,7 @@
     </parent>
 
     <artifactId>eva-tools</artifactId>
-    
+
     <!--Import dependency management from Spring Boot-->
     <dependencyManagement>
         <dependencies>
@@ -67,6 +67,21 @@
             <groupId>org.opencb.opencga</groupId>
             <artifactId>opencga-storage-core</artifactId>
             <version>${opencga.version}</version>
+            <exclusions>
+                <exclusion>
+                    <groupId>org.slf4j</groupId>
+                    <artifactId>slf4j-simple</artifactId>
+                </exclusion>
+                <exclusion>
+                    <groupId>org.opencb.cellbase</groupId>
+                    <artifactId>cellbase.core</artifactId>
+                </exclusion>
+            </exclusions>
+        </dependency>
+        <dependency>
+            <groupId>org.opencb.cellbase</groupId>
+            <artifactId>cellbase-core</artifactId>
+            <version>${cellbase.version}</version>
             <exclusions>
                 <exclusion>
                     <groupId>org.slf4j</groupId>
