@@ -238,12 +238,12 @@ public class VariantExporter {
      * behaviour:
      * * one VariantContext per study
      * * split multiallelic variant will remain split.
-     * * in case a normalized INDEL has empty alleles, the original alleles in the vcf line will be used.
+     * * in case a normalized INDEL has empty alleles, a query to cellbase will be done, to have the previous base as context
      *
      * steps:
      * * foreach variantSourceEntry, collect genotypes in its study, only if the study was requested
      * * get main variant data: position, alleles, filter...
-     * * if there are empty alleles, get them from the vcf line
+     * * if there are empty alleles, get them from cellbase
      * * get the genotypes
      * * add all (position, alleles, genotypes...) to a VariantContext for each study.
      *
@@ -277,7 +277,7 @@ public class VariantExporter {
                     genotypesPerStudy.put(studyId, new ArrayList<Genotype>());
                 }
 
-                // if there are indels, we cannot use the normalized alleles, (hts forbids empty alleles) so we have to take them from the original vcf line
+                // if there are indels, we cannot use the normalized alleles, (hts forbids empty alleles) so we have to take them from cellbase
                 boolean emptyAlleles = false;
                 for (String a : allelesArray) {
                     if (a.isEmpty()) {
