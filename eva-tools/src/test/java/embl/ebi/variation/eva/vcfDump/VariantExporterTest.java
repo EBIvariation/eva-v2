@@ -78,6 +78,7 @@ public class VariantExporterTest {
         String url = (String) Config.getStorageProperties().get("CELLBASE.REST.URL");
         String version = (String) Config.getStorageProperties().get("CELLBASE.VERSION");
 
+        logger.info("using cellbase: " + url + " version " + version);
 
         CellBaseClient cellBaseClient = new CellBaseClient(new URI(url), version, "hsapiens");
 
