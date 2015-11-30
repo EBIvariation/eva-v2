@@ -15,6 +15,7 @@
  */
 package embl.ebi.variation.eva.vcfDump;
 
+import org.opencb.cellbase.core.client.CellBaseClient;
 import org.opencb.datastore.core.QueryOptions;
 import org.opencb.opencga.lib.common.Config;
 import org.opencb.opencga.storage.core.StorageManagerException;
@@ -28,6 +29,8 @@ import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.OutputStream;
+import java.net.URI;
+import java.net.URISyntaxException;
 import java.util.Arrays;
 import java.util.List;
 import java.util.zip.GZIPOutputStream;
@@ -46,16 +49,28 @@ import java.util.zip.GZIPOutputStream;
 public class DumpMain {
 
     public static void main(String args[]) throws IllegalAccessException, ClassNotFoundException,
-            InstantiationException, StorageManagerException, IOException {
+            InstantiationException, StorageManagerException, IOException, URISyntaxException {
 
         Config.setOpenCGAHome(System.getenv("OPENCGA_HOME") != null ? System.getenv("OPENCGA_HOME") : "/opt/opencga");
 
         QueryOptions query = new QueryOptions();
-        List<String> files = Arrays.asList("5");
-        List<String> studies = Arrays.asList("7");
-        String dbName = "batch";
-        String outputDir = "./";
+        List<String> files;         // = Arrays.asList("5");
+        List<String> studies;       // = Arrays.asList("7");
+        String dbName;              // = "batch";
+        String outputDir;           // = "./";
+        String species;
 
+        if (args.length == 5) {
+            species = args[0];
+            dbName = args[1];
+            studies = Arrays.asList(args[2].split(","));
+            files = Arrays.asList(args[3].split(","));
+            outputDir = args[4];
+        } else {
+            System.out.println("usage: java -jar <jar> <species> <dbName> <studies CommaSeparatedValues> <files CSV> <output directory>");
+            System.out.println("example: java -jar eva-tools-0.1.jar hsapiens batch 7 5,6 ./");
+            return;
+        }
         query.put(VariantDBAdaptor.FILES, files);
         query.put(VariantDBAdaptor.STUDIES, studies);
 
@@ -64,7 +79,13 @@ public class DumpMain {
         VariantDBAdaptor variantDBAdaptor = variantStorageManager.getDBAdaptor(dbName, null);
         VariantDBIterator iterator = variantDBAdaptor.iterator(query);
         VariantSourceDBAdaptor variantSourceDBAdaptor = variantDBAdaptor.getVariantSourceDBAdaptor();
+        String url = (String) Config.getStorageProperties().get("CELLBASE.REST.URL");
+        String version = (String) Config.getStorageProperties().get("CELLBASE.VERSION");
 
-        List<String> fileNames = new VariantExporter().VcfHtsExport(iterator, outputDir, variantSourceDBAdaptor, query);
+
+        CellBaseClient cellBaseClient = new CellBaseClient(new URI(url), version, species);
+
+
+        List<String> fileNames = new VariantExporter(cellBaseClient).VcfHtsExport(iterator, outputDir, variantSourceDBAdaptor, query);
     }
 }
