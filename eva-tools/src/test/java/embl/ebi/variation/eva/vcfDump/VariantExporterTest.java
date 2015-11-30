@@ -39,6 +39,7 @@ import org.slf4j.LoggerFactory;
 
 import java.io.*;
 import java.net.URI;
+import java.net.URISyntaxException;
 import java.net.UnknownHostException;
 import java.util.*;
 import java.util.zip.GZIPInputStream;
@@ -48,7 +49,7 @@ import static org.junit.Assert.assertTrue;
 
 /**
  * Created by jmmut on 2015-10-29.
- * 
+ *
  * @author Jose Miguel Mut Lopez &lt;jmmut@ebi.ac.uk&gt;
  */
 public class VariantExporterTest {
@@ -58,10 +59,10 @@ public class VariantExporterTest {
 
     @Rule
     public ExpectedException thrown = ExpectedException.none();
+    private static CellBaseClient cellBaseClient;
 
     @Test
     public void testVcfHtsExport() throws Exception {
-        Config.setOpenCGAHome(System.getenv("OPENCGA_HOME") != null ? System.getenv("OPENCGA_HOME") : "/opt/opencga");
 
         QueryOptions query = new QueryOptions();
 //        List<String> files = Arrays.asList("5");
@@ -75,12 +76,6 @@ public class VariantExporterTest {
         VariantDBAdaptor variantDBAdaptor = variantStorageManager.getDBAdaptor(DB_NAME, null);
         VariantDBIterator iterator = variantDBAdaptor.iterator(query);
         VariantSourceDBAdaptor variantSourceDBAdaptor = variantDBAdaptor.getVariantSourceDBAdaptor();
-        String url = (String) Config.getStorageProperties().get("CELLBASE.REST.URL");
-        String version = (String) Config.getStorageProperties().get("CELLBASE.VERSION");
-
-        logger.info("using cellbase: " + url + " version " + version);
-
-        CellBaseClient cellBaseClient = new CellBaseClient(new URI(url), version, "hsapiens");
 
         VariantExporter variantExporter = new VariantExporter(cellBaseClient);
         List<String> outputFiles = variantExporter.VcfHtsExport(iterator, outputDir, variantSourceDBAdaptor, query);
@@ -97,10 +92,9 @@ public class VariantExporterTest {
             assertTrue(delete);
         }
     }
-    
+
     @Test
     public void testVcfHtsExportSeveralStudies() throws Exception {
-        Config.setOpenCGAHome(System.getenv("OPENCGA_HOME") != null ? System.getenv("OPENCGA_HOME") : "/opt/opencga");
 
         QueryOptions query = new QueryOptions();
 //        List<String> files = Arrays.asList("5");
@@ -115,12 +109,6 @@ public class VariantExporterTest {
         VariantDBAdaptor variantDBAdaptor = variantStorageManager.getDBAdaptor(DB_NAME, null);
         VariantDBIterator iterator = variantDBAdaptor.iterator(query);
         VariantSourceDBAdaptor variantSourceDBAdaptor = variantDBAdaptor.getVariantSourceDBAdaptor();
-        String url = (String) Config.getStorageProperties().get("CELLBASE.REST.URL");
-        String version = (String) Config.getStorageProperties().get("CELLBASE.VERSION");
-
-
-        CellBaseClient cellBaseClient = new CellBaseClient(new URI(url), version, "hsapiens");
-
 
         VariantExporter variantExporter = new VariantExporter(cellBaseClient);
         List<String> outputFiles = variantExporter.VcfHtsExport(iterator, outputDir, variantSourceDBAdaptor, query);
@@ -129,27 +117,26 @@ public class VariantExporterTest {
 
         assertEquals(studies.size(), outputFiles.size());
         assertEquals(0, variantExporter.getFailedVariants());
-        
+
         // for study 7
         query.put(VariantDBAdaptor.STUDIES, Collections.singletonList("7"));
         iterator = variantDBAdaptor.iterator(query);
         assertEquals(countRows(iterator), countLines(outputFiles.get(0)));
-        
+
         // for study 8
         query.put(VariantDBAdaptor.STUDIES, Collections.singletonList("8"));
         iterator = variantDBAdaptor.iterator(query);
         assertEquals(countRows(iterator), countLines(outputFiles.get(1)));
-        
+
 
         for (String outputFile : outputFiles) {
             boolean delete = new File(outputFile).delete();
             assertTrue(delete);
         }
     }
-    
+
     @Test
     public void testFilter() throws Exception {
-        Config.setOpenCGAHome(System.getenv("OPENCGA_HOME") != null ? System.getenv("OPENCGA_HOME") : "/opt/opencga");
 
         QueryOptions query = new QueryOptions();
 //        List<String> files = Arrays.asList("5");
@@ -168,16 +155,10 @@ public class VariantExporterTest {
         VariantDBAdaptor variantDBAdaptor = variantStorageManager.getDBAdaptor(DB_NAME, null);
         VariantDBIterator iterator = variantDBAdaptor.iterator(query);
         VariantSourceDBAdaptor variantSourceDBAdaptor = variantDBAdaptor.getVariantSourceDBAdaptor();
-        String url = (String) Config.getStorageProperties().get("CELLBASE.REST.URL");
-        String version = (String) Config.getStorageProperties().get("CELLBASE.VERSION");
-
-
-        CellBaseClient cellBaseClient = new CellBaseClient(new URI(url), version, "hsapiens");
-
 
         VariantExporter variantExporter = new VariantExporter(cellBaseClient);
         List<String> outputFiles = variantExporter.VcfHtsExport(iterator, outputDir, variantSourceDBAdaptor, query);
-        
+
         ////////// checks
 
         assertEquals(studies.size(), outputFiles.size());
@@ -194,7 +175,6 @@ public class VariantExporterTest {
 
     @Test
     public void testMissingStudy() throws Exception {
-        Config.setOpenCGAHome(System.getenv("OPENCGA_HOME") != null ? System.getenv("OPENCGA_HOME") : "/opt/opencga");
 
         QueryOptions query = new QueryOptions();
         List<String> files = Arrays.asList("5");
@@ -207,12 +187,6 @@ public class VariantExporterTest {
         VariantDBAdaptor variantDBAdaptor = variantStorageManager.getDBAdaptor(DB_NAME, null);
         VariantDBIterator iterator = variantDBAdaptor.iterator(query);
         VariantSourceDBAdaptor variantSourceDBAdaptor = variantDBAdaptor.getVariantSourceDBAdaptor();
-        String url = (String) Config.getStorageProperties().get("CELLBASE.REST.URL");
-        String version = (String) Config.getStorageProperties().get("CELLBASE.VERSION");
-
-
-        CellBaseClient cellBaseClient = new CellBaseClient(new URI(url), version, "hsapiens");
-
 
         VariantExporter variantExporter = new VariantExporter(cellBaseClient);
 
@@ -285,12 +259,6 @@ public class VariantExporterTest {
         List<Variant> variants;
         Map<String, VariantContext> variantContext;
         List<String> alleles;
-        String url = (String) Config.getStorageProperties().get("CELLBASE.REST.URL");
-        String version = (String) Config.getStorageProperties().get("CELLBASE.VERSION");
-
-
-        CellBaseClient cellBaseClient = new CellBaseClient(new URI(url), version, "hsapiens");
-
 
         // test multiallelic
         String multiallelicLine = "1\t1000\tid\tC\tA,T\t100\tPASS\t.\tGT\t0|0\t0|0\t0|1\t1|1\t1|2\t0|1";
@@ -299,7 +267,7 @@ public class VariantExporterTest {
 
         VariantExporter variantExporter = new VariantExporter(cellBaseClient);
         variantContext = variantExporter.convertBiodataVariantToVariantContext(variants.get(0), sources);
-        
+
         alleles = Arrays.asList("C", "A", ".");
         assertEqualGenotypes(variants.get(0), variantContext.get(studyId), alleles);
 
@@ -338,15 +306,21 @@ public class VariantExporterTest {
      * @throws java.lang.InterruptedException
      */
     @BeforeClass
-    public static void setUpClass() throws IOException, InterruptedException {
+    public static void setUpClass() throws IOException, InterruptedException, URISyntaxException {
         cleanDBs();
         fillDB();
+
+        Config.setOpenCGAHome(System.getenv("OPENCGA_HOME") != null ? System.getenv("OPENCGA_HOME") : "/opt/opencga");
+        String url = (String) Config.getStorageProperties().get("CELLBASE.REST.URL");
+        String version = (String) Config.getStorageProperties().get("CELLBASE.VERSION");
+        logger.info("using cellbase: " + url + " version " + version);
+        cellBaseClient = new CellBaseClient(new URI(url), version, "hsapiens");
     }
 
     /**
      * Clears and populates the Mongo collection used during the tests.
-     * 
-     * @throws UnknownHostException 
+     *
+     * @throws UnknownHostException
      */
     @AfterClass
     public static void tearDownClass() throws UnknownHostException {
@@ -382,7 +356,7 @@ public class VariantExporterTest {
 
         logger.info("mongorestore exit value: " + exec.exitValue());
     }
-    
+
     private void removeSrc(List<Variant> variants) {
         for (Variant variant : variants) {
             for (VariantSourceEntry variantSourceEntry : variant.getSourceEntries().values()) {

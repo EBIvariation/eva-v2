@@ -78,7 +78,7 @@ public class VariantExporter {
     /**
      * Main method of this class. It generates one VCF file per requested study,
      * writing both the header meta-data and the variants in the body.
-     * 
+     *
      * @param iterator where to get the variants from
      * @param outputDir directory to write the output vcf(s) to
      * @param sourceDBAdaptor to retrieve all the VariantSources in any VariantSourceEntry
@@ -174,7 +174,7 @@ public class VariantExporter {
      */
     private Map<String, VCFHeader> getVcfHeaders(Map<String, VariantSource> sources) throws IOException {
         Map<String, VCFHeader> headers = new TreeMap<>();
-        
+
         for (VariantSource source : sources.values()) {
             Object headerObject = source.getMetadata().get(DBObjectToVariantSourceConverter.HEADER_FIELD);
 
@@ -224,13 +224,6 @@ public class VariantExporter {
 
     public int getFailedVariants() {
         return failedVariants;
-    }
-
-    class VariantFields {
-        public int start;
-        public int end;
-        public String reference;
-        public String alternate;
     }
 
     /**
@@ -303,8 +296,8 @@ public class VariantExporter {
                         }
                     } else {
                         throw new IllegalArgumentException(String.format(
-                                        "CellBase was not provided, needed to fill empty alleles at study %s, in variant %s:%d:%s>%s", studyId,
-                                        variant.getChromosome(), variant.getStart(), variant.getReference(), variant.getAlternate()));
+                                "CellBase was not provided, needed to fill empty alleles at study %s, in variant %s:%d:%s>%s", studyId,
+                                variant.getChromosome(), variant.getStart(), variant.getReference(), variant.getAlternate()));
                     }
                 }
 
@@ -334,7 +327,7 @@ public class VariantExporter {
         }
 
         if (missingGenotypes > 0) {
-            logger.info("Variant %s:%d:%s>%s lacked the GT field in %d genotypes (they will be printed as \"./.\").", 
+            logger.info("Variant %s:%d:%s>%s lacked the GT field in %d genotypes (they will be printed as \"./.\").",
                     variant.getChromosome(), variant.getStart(), variant.getReference(), variant.getAlternate());
         }
 
@@ -352,52 +345,4 @@ public class VariantExporter {
         }
         return variantContextMap;
     }
-
-    /**
-     * In case there is an INDEL (multiallelic or not), we have to retrieve the alleles from the original VCF line.
-     * 
-     * @param variant the variant as available in the variant store
-     * @param variantSource VCF file meta-data as available in the variant store
-     * @param srcLine the original VCF line as available in the variant store
-     * @return the variant coordinates and alleles to write as output
-     */
-    private VariantFields getVariantFields(Variant variant, VariantSource variantSource, String srcLine) {
-        String[] split = srcLine.split("\t", 6);
-        StringBuilder newLineBuilder = new StringBuilder();
-        for (int i = 0; i < split.length - 1; i++) {
-            newLineBuilder.append(split[i]).append("\t");
-        }
-        newLineBuilder.append(".\t.\t.");   // ignoring qual, filter, info, format and genotypes. We just want normalization
-        VariantFactory variantFactory = new VariantVcfFactory();
-        List<Variant> variants = variantFactory.create(variantSource, newLineBuilder.toString());
-
-        int alleleNumber = 0;
-        for (Variant v : variants) {
-            // reference should be always equal; this may be shortened
-            if (v.getReference().equals(variant.getReference()) && v.getAlternate().equals(variant.getAlternate())) {
-                break;
-            }
-            alleleNumber++;
-        }
-
-        String[] alts = split[4].split(",");
-        if (alleleNumber >= alts.length) {
-            throw new IllegalArgumentException(String.format(
-                    "Variant %s:%d:%s>%s has empty alleles and no original VCF line stored",
-                    variant.getChromosome(), variant.getStart(), variant.getReference(), variant.getAlternate()));
-        }
-
-        VariantFields variantFields = new VariantFields();
-        variantFields.reference = split[3];
-        variantFields.alternate = alts[alleleNumber];
-        variantFields.start = Integer.parseInt(split[1]);
-        variantFields.end = variantFields.start + variantFields.reference.length()-1;
-
-        logger.debug("Using alleles from original VCF line in {}:{}:{}>{}. Original REF and ALT: \"{}>{}\". Output: \"{}>{}\"",
-                variant.getChromosome(), variant.getStart(), variant.getReference(), variant.getAlternate(),
-                variantFields.reference, StringUtils.join(alts, ","),
-                variantFields.reference, variantFields.alternate);
-        return variantFields;
-    }
-
 }
