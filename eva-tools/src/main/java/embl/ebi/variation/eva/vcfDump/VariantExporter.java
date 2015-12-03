@@ -138,6 +138,7 @@ public class VariantExporter {
 
         // actual loop
         int failedVariants = 0;
+        int writtenVariants = 0;
         while (iterator.hasNext()) {
             Variant variant = iterator.next();
             try {
@@ -153,8 +154,13 @@ public class VariantExporter {
                         e);
                 failedVariants++;
             }
+            writtenVariants++;
+            if (writtenVariants % 1000000 == 0) {
+                logger.info("written variants: " + writtenVariants);
+            }
         }
 
+        logger.info("total variants written: " + writtenVariants);
         if (failedVariants > 0) {
             logger.warn(failedVariants + " variants were not written due to errors");
         }
