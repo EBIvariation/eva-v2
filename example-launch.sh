@@ -1,4 +1,5 @@
 java -jar eva-pipeline/target/eva-pipeline-0.1.jar \
+ --spring.batch.job.names=variantJob \
  input=data/small.vcf \
  fileId=5 \
  aggregated=NONE \
@@ -13,5 +14,6 @@ java -jar eva-pipeline/target/eva-pipeline-0.1.jar \
  compressGenotypes=true \
  compressExtension=.gz \
  includeSrc=FIRST_8_COLUMNS \
- skipLoad=false
+ skipLoad=false \
+ opencga.app.home=/opt/opencga/
 
