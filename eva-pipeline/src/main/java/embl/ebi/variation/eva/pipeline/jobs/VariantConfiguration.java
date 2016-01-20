@@ -15,7 +15,7 @@
  */
 package embl.ebi.variation.eva.pipeline.jobs;
 
-import embl.ebi.variation.eva.pipeline.listeners.JobParametersListener;
+import embl.ebi.variation.eva.pipeline.listeners.VariantJobParametersListener;
 import embl.ebi.variation.eva.pipeline.steps.*;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -47,15 +47,15 @@ public class VariantConfiguration {
     @Autowired
     private StepBuilderFactory stepBuilderFactory;
     @Autowired
-    private JobParametersListener listener;
+    private VariantJobParametersListener listener;
     @Autowired
     JobLauncher jobLauncher;
     @Autowired
     Environment environment;
 
     @Bean
-    public JobParametersListener jobParametersListener() {
-        return new JobParametersListener();
+    public VariantJobParametersListener variantJobParametersListener() {
+        return new VariantJobParametersListener();
     }
 
     @Bean
