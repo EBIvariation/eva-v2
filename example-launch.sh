@@ -10,6 +10,7 @@ java -jar eva-pipeline/target/eva-pipeline-0.1.jar \
  pedigree= \
  dbName=batch \
  storageEngine=mongodb \
+ overwriteStats=true \
  compressGenotypes=true \
  compressExtension=.gz \
  includeSrc=FIRST_8_COLUMNS \
