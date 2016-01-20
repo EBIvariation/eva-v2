@@ -36,10 +36,10 @@ import org.springframework.core.env.Environment;
 
 @Configuration
 @EnableBatchProcessing
-public class VariantConfiguration {
+public class VariantAnnotConfiguration {
 
-    private static final Logger logger = LoggerFactory.getLogger(VariantConfiguration.class);
-    public static final String jobName = "variantJob";
+    private static final Logger logger = LoggerFactory.getLogger(VariantAnnotConfiguration.class);
+    public static final String jobName = "variantAnnotJob";
 
     @Autowired
     private JobBuilderFactory jobBuilderFactory;
@@ -58,62 +58,17 @@ public class VariantConfiguration {
     }
 
     @Bean
-    public Job variantJob() {
+    public Job variantStatsJob() {
         JobBuilder jobBuilder = jobBuilderFactory
                 .get(jobName)
                 .incrementer(new RunIdIncrementer())
                 .listener(listener);
 
         return jobBuilder
-                .start(transform())
-                .next(load())
-                .next(statsCreate())
-                .next(statsLoad())
-                .next(annotationPreCreate())
+                .start(annotationPreCreate())
                 .next(annotationCreate())
                 .next(annotationLoad())
                 .build();
-    }
-
-    public Step transform() {
-        StepBuilder step1 = stepBuilderFactory.get("transform");
-        TaskletStepBuilder tasklet = step1.tasklet(new VariantsTransform(listener));
-
-        // true: every job execution will do this step, even if this step is already COMPLETED
-        // false: if the job was aborted and is relaunched, this step will NOT be done again
-        tasklet.allowStartIfComplete(false);
-
-        return tasklet.build();
-    }
-
-    public Step load() {
-        StepBuilder step1 = stepBuilderFactory.get("load");
-        TaskletStepBuilder tasklet = step1.tasklet(new VariantsLoad(listener));
-
-        // true: every job execution will do this step, even if this step is already COMPLETED
-        // false: if the job was aborted and is relaunched, this step will NOT be done again
-        tasklet.allowStartIfComplete(false);
-        return tasklet.build();
-    }
-
-    public Step statsCreate() {
-        StepBuilder step1 = stepBuilderFactory.get("statsCreate");
-        TaskletStepBuilder tasklet = step1.tasklet(new VariantsStatsCreate(listener));
-
-        // true: every job execution will do this step, even if this step is already COMPLETED
-        // false: if the job was aborted and is relaunched, this step will NOT be done again
-        tasklet.allowStartIfComplete(false);
-        return tasklet.build();
-    }
-
-    public Step statsLoad() {
-        StepBuilder step1 = stepBuilderFactory.get("statsLoad");
-        TaskletStepBuilder tasklet = step1.tasklet(new VariantsStatsLoad(listener));
-
-        // true: every job execution will do this step, even if this step is already COMPLETED
-        // false: if the job was aborted and is relaunched, this step will NOT be done again
-        tasklet.allowStartIfComplete(false);
-        return tasklet.build();
     }
 
     public Step annotationPreCreate() {

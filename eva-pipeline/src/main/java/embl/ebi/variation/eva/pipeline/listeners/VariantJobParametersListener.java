@@ -27,22 +27,10 @@ import org.springframework.batch.core.JobExecutionListener;
 import org.springframework.batch.core.JobParameters;
 import org.springframework.stereotype.Component;
 
+@Component
+public class VariantJobParametersListener extends JobParametersListener {
 
-public class JobParametersListener implements JobExecutionListener {
-     
-    private static final Logger logger = LoggerFactory.getLogger(JobParametersListener.class);
-    
-    protected final ObjectMap variantOptions;
-    
-    public JobParametersListener() {
-        variantOptions = new ObjectMap();
-    }
-    
-    @Override
-    public void afterJob(JobExecution jobExecution) {
-        logger.info("afterJob STATUS + " + jobExecution.getStatus());
-        logger.info("afterJob : " + jobExecution);
-    }
+    private static final Logger logger = LoggerFactory.getLogger(VariantJobParametersListener.class);
 
     @Override
     public void beforeJob(JobExecution jobExecution) {
@@ -73,7 +61,7 @@ public class JobParametersListener implements JobExecutionListener {
 //                variantOptions.put(VariantStorageManager.SAMPLE_IDS, Arrays.asList(config.samples.split(",")));
         
         variantOptions.put(VariantStorageManager.CALCULATE_STATS, false);   // this is tested by hand
-//                variantOptions.put(VariantStorageManager.OVERWRITE_STATS, config.overwriteStats);
+        variantOptions.put(VariantStorageManager.OVERWRITE_STATS, parameters.getString("overwriteStats"));
         variantOptions.put(VariantStorageManager.INCLUDE_STATS, false);
         
 //                variantOptions.put(VariantStorageManager.INCLUDE_GENOTYPES.key(), false);   // TODO rename samples to genotypes
@@ -106,9 +94,5 @@ public class JobParametersListener implements JobExecutionListener {
 //                // stats config
 ////                statsOutputUri = outdirUri.resolve(VariantStorageManager.buildFilename(source) + "." + TimeUtils.getTime());  // TODO why was the timestamp required?
 //                statsOutputUri = outdirUri.resolve(VariantStorageManager.buildFilename(source));
-    }
-    
-    public ObjectMap getVariantOptions() {
-        return variantOptions;
     }
 }

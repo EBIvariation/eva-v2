@@ -15,39 +15,98 @@
  */
 package embl.ebi.variation.eva.pipeline.jobs;
 
-
+import embl.ebi.variation.eva.pipeline.listeners.AggregatedJobParametersListener;
+import embl.ebi.variation.eva.pipeline.steps.VariantsLoad;
+import embl.ebi.variation.eva.pipeline.steps.VariantsTransform;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.batch.core.Job;
-import org.springframework.batch.core.JobExecutionListener;
 import org.springframework.batch.core.Step;
-import org.springframework.batch.core.StepContribution;
-import org.springframework.batch.core.configuration.JobRegistry;
 import org.springframework.batch.core.configuration.annotation.EnableBatchProcessing;
 import org.springframework.batch.core.configuration.annotation.JobBuilderFactory;
 import org.springframework.batch.core.configuration.annotation.StepBuilderFactory;
-import org.springframework.batch.core.explore.JobExplorer;
 import org.springframework.batch.core.job.builder.JobBuilder;
-import org.springframework.batch.core.job.builder.JobFlowBuilder;
 import org.springframework.batch.core.launch.JobLauncher;
 import org.springframework.batch.core.launch.support.RunIdIncrementer;
-import org.springframework.batch.core.repository.JobRepository;
-import org.springframework.batch.core.scope.context.ChunkContext;
 import org.springframework.batch.core.step.builder.StepBuilder;
 import org.springframework.batch.core.step.builder.TaskletStepBuilder;
-import org.springframework.batch.core.step.tasklet.Tasklet;
-import org.springframework.batch.repeat.RepeatStatus;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.beans.factory.annotation.Value;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.core.env.Environment;
 
-//@Configuration
-//@EnableBatchProcessing
+import java.net.URI;
+import java.net.URISyntaxException;
+import java.nio.file.Paths;
+
+@Configuration
+@EnableBatchProcessing
 public class VariantAggregatedConfiguration {
 
-    private static final Logger log = LoggerFactory.getLogger(VariantAggregatedConfiguration.class);
+    private static final Logger logger = LoggerFactory.getLogger(VariantAggregatedConfiguration.class);
     public static final String jobName = "aggregatedVariantJob";
+
+    @Autowired
+    private JobBuilderFactory jobBuilderFactory;
+    @Autowired
+    private StepBuilderFactory stepBuilderFactory;
+    @Autowired
+    private AggregatedJobParametersListener listener;
+    @Autowired
+    JobLauncher jobLauncher;
+    @Autowired
+    Environment environment;
+
+    @Bean
+    public AggregatedJobParametersListener aggregatedJobParametersListener() {
+        return new AggregatedJobParametersListener();
+    }
+
+    @Bean
+    public Job aggregatedVariantJob() {
+        JobBuilder jobBuilder = jobBuilderFactory
+                .get(jobName)
+                .incrementer(new RunIdIncrementer())
+                .listener(listener);
+
+        return jobBuilder
+                .start(transform())
+                .next(load())
+//                .next(statsCreate())
+//                .next(statsLoad())
+//                .next(annotation(stepBuilderFactory));
+                .build();
+    }
+
+    public Step transform() {
+        StepBuilder step1 = stepBuilderFactory.get("transform");
+        final TaskletStepBuilder tasklet = step1.tasklet(new VariantsTransform(listener));
+
+        // true: every job execution will do this step, even if this step is already COMPLETED
+        // false: if the job was aborted and is relaunched, this step will NOT be done again
+        tasklet.allowStartIfComplete(false);
+
+        return tasklet.build();
+    }
+
+    public Step load() {
+        StepBuilder step1 = stepBuilderFactory.get("load");
+        TaskletStepBuilder tasklet = step1.tasklet(new VariantsLoad(listener));
+
+        // true: every job execution will do this step, even if this step is already COMPLETED
+        // false: if the job was aborted and is relaunched, this step will NOT be done again
+        tasklet.allowStartIfComplete(false);
+        return tasklet.build();
+    }
+
+    public static URI createUri(String input) throws URISyntaxException {
+        URI sourceUri = new URI(null, input, null);
+        if (sourceUri.getScheme() == null || sourceUri.getScheme().isEmpty()) {
+            sourceUri = Paths.get(input).toUri();
+        }
+        return sourceUri;
+    }
 /*
     @Autowired
     JobLauncher jobLauncher;

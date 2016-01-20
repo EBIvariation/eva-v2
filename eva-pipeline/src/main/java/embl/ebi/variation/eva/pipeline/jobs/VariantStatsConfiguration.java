@@ -15,8 +15,10 @@
  */
 package embl.ebi.variation.eva.pipeline.jobs;
 
+import embl.ebi.variation.eva.pipeline.listeners.JobParametersListener;
 import embl.ebi.variation.eva.pipeline.listeners.VariantJobParametersListener;
-import embl.ebi.variation.eva.pipeline.steps.*;
+import embl.ebi.variation.eva.pipeline.steps.VariantsStatsCreate;
+import embl.ebi.variation.eva.pipeline.steps.VariantsStatsLoad;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.batch.core.Job;
@@ -30,16 +32,17 @@ import org.springframework.batch.core.launch.support.RunIdIncrementer;
 import org.springframework.batch.core.step.builder.StepBuilder;
 import org.springframework.batch.core.step.builder.TaskletStepBuilder;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.core.env.Environment;
 
 @Configuration
 @EnableBatchProcessing
-public class VariantConfiguration {
+public class VariantStatsConfiguration {
 
-    private static final Logger logger = LoggerFactory.getLogger(VariantConfiguration.class);
-    public static final String jobName = "variantJob";
+    private static final Logger logger = LoggerFactory.getLogger(VariantStatsConfiguration.class);
+    public static final String jobName = "variantStatsJob";
 
     @Autowired
     private JobBuilderFactory jobBuilderFactory;
@@ -58,42 +61,16 @@ public class VariantConfiguration {
     }
 
     @Bean
-    public Job variantJob() {
+    public Job variantStatsJob() {
         JobBuilder jobBuilder = jobBuilderFactory
                 .get(jobName)
                 .incrementer(new RunIdIncrementer())
                 .listener(listener);
 
         return jobBuilder
-                .start(transform())
-                .next(load())
-                .next(statsCreate())
+                .start(statsCreate())
                 .next(statsLoad())
-                .next(annotationPreCreate())
-                .next(annotationCreate())
-                .next(annotationLoad())
                 .build();
-    }
-
-    public Step transform() {
-        StepBuilder step1 = stepBuilderFactory.get("transform");
-        TaskletStepBuilder tasklet = step1.tasklet(new VariantsTransform(listener));
-
-        // true: every job execution will do this step, even if this step is already COMPLETED
-        // false: if the job was aborted and is relaunched, this step will NOT be done again
-        tasklet.allowStartIfComplete(false);
-
-        return tasklet.build();
-    }
-
-    public Step load() {
-        StepBuilder step1 = stepBuilderFactory.get("load");
-        TaskletStepBuilder tasklet = step1.tasklet(new VariantsLoad(listener));
-
-        // true: every job execution will do this step, even if this step is already COMPLETED
-        // false: if the job was aborted and is relaunched, this step will NOT be done again
-        tasklet.allowStartIfComplete(false);
-        return tasklet.build();
     }
 
     public Step statsCreate() {
@@ -109,36 +86,6 @@ public class VariantConfiguration {
     public Step statsLoad() {
         StepBuilder step1 = stepBuilderFactory.get("statsLoad");
         TaskletStepBuilder tasklet = step1.tasklet(new VariantsStatsLoad(listener));
-
-        // true: every job execution will do this step, even if this step is already COMPLETED
-        // false: if the job was aborted and is relaunched, this step will NOT be done again
-        tasklet.allowStartIfComplete(false);
-        return tasklet.build();
-    }
-
-    public Step annotationPreCreate() {
-        StepBuilder step1 = stepBuilderFactory.get("annotationPreCreate");
-        TaskletStepBuilder tasklet = step1.tasklet(new VariantsAnnotPreCreate(listener));
-
-        // true: every job execution will do this step, even if this step is already COMPLETED
-        // false: if the job was aborted and is relaunched, this step will NOT be done again
-        tasklet.allowStartIfComplete(false);
-        return tasklet.build();
-    }
-
-    public Step annotationCreate() {
-        StepBuilder step1 = stepBuilderFactory.get("annotationCreate");
-        TaskletStepBuilder tasklet = step1.tasklet(new VariantsAnnotCreate(listener));
-
-        // true: every job execution will do this step, even if this step is already COMPLETED
-        // false: if the job was aborted and is relaunched, this step will NOT be done again
-        tasklet.allowStartIfComplete(false);
-        return tasklet.build();
-    }
-
-    public Step annotationLoad() {
-        StepBuilder step1 = stepBuilderFactory.get("annotationLoad");
-        TaskletStepBuilder tasklet = step1.tasklet(new VariantsAnnotLoad(listener));
 
         // true: every job execution will do this step, even if this step is already COMPLETED
         // false: if the job was aborted and is relaunched, this step will NOT be done again
