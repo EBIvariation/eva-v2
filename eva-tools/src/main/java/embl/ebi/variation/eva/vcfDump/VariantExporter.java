@@ -150,7 +150,7 @@ public class VariantExporter {
                 }
             } catch (Exception e) {
                 logger.info(String.format("Variant dump failed: \"%s:%d:%s>%s\"", variant.getChromosome(),
-                                variant.getStart(), variant.getReference(), variant.getAlternate()),
+                        variant.getStart(), variant.getReference(), variant.getAlternate()),
                         e);
                 failedVariants++;
             }
