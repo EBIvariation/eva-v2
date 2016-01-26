@@ -17,23 +17,26 @@ package embl.ebi.variation.eva;
 
 
 import javax.servlet.http.HttpServletRequest;
-import javax.ws.rs.GET;
-import javax.ws.rs.Path;
-import javax.ws.rs.PathParam;
-import javax.ws.rs.Produces;
+import javax.ws.rs.*;
 import javax.ws.rs.core.*;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.ObjectWriter;
+import embl.ebi.variation.eva.vcfDump.VariantExporterController;
+import org.apache.commons.io.IOUtils;
 import org.opencb.datastore.core.ObjectMap;
 import org.opencb.datastore.core.QueryOptions;
 import org.opencb.datastore.core.QueryResponse;
 import org.opencb.datastore.core.QueryResult;
+import org.opencb.opencga.lib.common.Config;
+import org.opencb.opencga.storage.core.StorageManagerException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.io.IOException;
-import java.util.ArrayList;
-import java.util.LinkedList;
-import java.util.List;
+import java.io.*;
+import java.net.URISyntaxException;
+import java.util.*;
 
 /**
  * Created by jmmut on 2016-01-22.
@@ -55,6 +58,15 @@ public class VariantVCFDownloader {
     protected long startTime;
     protected long endTime;
 
+    protected static ObjectWriter jsonObjectWriter;
+    protected static ObjectMapper jsonObjectMapper;
+
+
+//    {
+//        jsonObjectMapper = new ObjectMapper();
+//        jsonObjectWriter = jsonObjectMapper.writer();
+//    }
+
     public VariantVCFDownloader(@PathParam("version") String version, @Context UriInfo uriInfo, @Context HttpServletRequest httpServletRequest) throws IOException {
         this.startTime = System.currentTimeMillis();
         this.version = version;
@@ -63,6 +75,8 @@ public class VariantVCFDownloader {
         logger.debug(uriInfo.getRequestUri().toString());
         this.queryOptions = null;
         this.sessionIp = httpServletRequest.getRemoteAddr();
+        Config.setOpenCGAHome(System.getenv("OPENCGA_HOME") != null ? System.getenv("OPENCGA_HOME") : "/opt/opencga");
+
     }
 
     @GET
@@ -75,7 +89,7 @@ public class VariantVCFDownloader {
     @GET
     @Path("/test")
     @Produces("text/plain")
-    public Response info(@PathParam("testString") String string) {
+    public Response info(@QueryParam("testString") String string) {
         startTime = System.currentTimeMillis();
         try {
 
@@ -85,7 +99,75 @@ public class VariantVCFDownloader {
         }
         logger.info("VariantVCFDownloader finished ok");
 
-        return createOkResponse("this is a mock of the response, testString = " + string);
+        return createJsonResponse("this is a mock of the response, testString = " + string);
+    }
+
+    @GET
+    @Path("/attach")
+    @Produces(MediaType.APPLICATION_OCTET_STREAM)
+    public Response attach(@QueryParam("dbname") String dbname) throws ClassNotFoundException, StorageManagerException, URISyntaxException, InstantiationException, IllegalAccessException, IOException {
+        startTime = System.currentTimeMillis();
+
+            VariantExporterController vec = new VariantExporterController(
+                    "hsapiens", dbname, Collections.singletonList("7"), Collections.singletonList("5"), "/tmp");
+
+            final List<String> files = vec.run();
+        logger.info("returning dumped vcf as " + files.get(0));
+        return createOkResponse(new File(files.get(0)), MediaType.APPLICATION_OCTET_STREAM_TYPE, files.get(0));
+    }
+
+
+    @GET
+    @Path("/download")
+    @Produces("text/plain")
+    public StreamingOutput download(@QueryParam("dbname") String dbname)
+            throws ClassNotFoundException, StorageManagerException, URISyntaxException, InstantiationException, IllegalAccessException, IOException {
+        startTime = System.currentTimeMillis();
+        StreamingOutput streamingOutput = null;
+        try {
+            VariantExporterController vec = new VariantExporterController(
+                    "hsapiens", dbname, Collections.singletonList("7"), Collections.singletonList("5"), "/tmp");
+
+            final List<String> files = vec.run();
+            streamingOutput = new StreamingOutput() {
+               @Override
+                   public void write(OutputStream outputStream) throws IOException, WebApplicationException {
+                       BufferedOutputStream bufferedOutputStream = new BufferedOutputStream(outputStream);
+                       try {
+                           FileInputStream fileInputStream = new FileInputStream(files.get(0));
+                           byte[] buffer = IOUtils.toByteArray(fileInputStream);
+                           bufferedOutputStream.write(buffer);
+                       } catch (Exception e) {
+                           e.printStackTrace();
+                       }
+                   }
+               };
+
+
+            logger.info("VariantVCFDownloader finished ok");
+        } catch (Exception e) {
+            logger.error("VariantExporter failed: ", e);
+//            return createErrorResponse(e.getMessage());
+        }
+
+        return streamingOutput;
+    }
+
+    protected Response createJsonResponse(Object object) {
+//        try {
+            logger.info("on createJsonResponse, object=" + object.toString());
+//            String entity = jsonObjectWriter.writeValueAsString(object);  // doesn't work, glassfish cannot instanciate VariantVCFDownloader
+            Response.ResponseBuilder ok = Response.ok("{\"msg\":\"" + object.toString() + "\"}", MediaType.APPLICATION_JSON_TYPE);
+            Response response = buildResponse(ok);
+            return response;
+//        } catch (JsonProcessingException e) {
+//            System.out.println("object = " + object);
+//            System.out.println("((QueryResponse)object).getResponse() = " + ((QueryResponse) object).getResponse());
+//
+//            System.out.println("e = " + e);
+//            System.out.println("e.getMessage() = " + e.getMessage());
+//            return createErrorResponse("Error parsing QueryResponse object:\n" + Arrays.toString(e.getStackTrace()));
+//        }
     }
 
     protected Response createOkResponse(Object obj) {
