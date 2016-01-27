@@ -19,7 +19,12 @@ java -jar eva-pipeline/target/eva-pipeline-0.1.jar \
  vepParameters="--force_overwrite --cache --cache_version 78 -dir /nfs/production2/eva/VEP/cache_1 --offline -o STDOUT --species homo_sapiens --everything" \
  vepFasta="--fasta /nfs/production2/eva/VEP/cache_1/homo_sapiens/78_GRCh37/Homo_sapiens.GRCh37.75.dna.primary_assembly.fa" \
  vepOutput=out/variants.annot.tsv.gz \
+ skipAnnotGenerateInput=true \
  skipAnnotCreate=true \
+ skipAnnotLoad=true \
  skipLoad=false \
+ --logging.level.embl.ebi.variation.eva=DEBUG \
+ --logging.level.org.opencb.opencga=DEBUG \
+ --logging.level.org.springframework=INFO \
  opencga.app.home=/opt/opencga
 

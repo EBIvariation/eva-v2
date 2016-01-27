@@ -69,7 +69,7 @@ the command line, like this:
  that what you need is another job.
 * `skipStatsCreate`
 * `skipStatsLoad`
-* `skipAnnotPreCreate`
+* `skipAnnotGenerateInput`
 * `skipAnnotCreate`
 * `skipAnnotLoad`
 
