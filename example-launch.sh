@@ -1,14 +1,14 @@
 java -jar eva-pipeline/target/eva-pipeline-0.1.jar \
  --spring.batch.job.names=variantJob \
- input=data/small.vcf \
- outputDir= \
+ input=data/big.vcf \
+ outputDir=/tmp \
  fileId=5 \
  aggregated=NONE \
  studyType=COLLECTION \
  studyName=studyName \
  studyId=7 \
  pedigree= \
- dbName=batch \
+ dbName=batchbig \
  storageEngine=mongodb \
  overwriteStats=true \
  compressGenotypes=true \
@@ -23,6 +23,8 @@ java -jar eva-pipeline/target/eva-pipeline-0.1.jar \
  skipAnnotCreate=true \
  skipAnnotLoad=true \
  skipLoad=false \
+ skipStatsCreate=true \
+ skipStatsLoad=true \
  --logging.level.embl.ebi.variation.eva=DEBUG \
  --logging.level.org.opencb.opencga=DEBUG \
  --logging.level.org.springframework=INFO \

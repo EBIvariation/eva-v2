@@ -20,9 +20,6 @@ import javax.servlet.http.HttpServletRequest;
 import javax.ws.rs.*;
 import javax.ws.rs.core.*;
 
-import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.databind.ObjectWriter;
 import embl.ebi.variation.eva.vcfDump.VariantExporterController;
 import org.apache.commons.io.IOUtils;
 import org.opencb.datastore.core.ObjectMap;
@@ -57,9 +54,10 @@ public class VariantVCFDownloader {
     // Common output members
     protected long startTime;
     protected long endTime;
+    private final String PROPERTIES = "/ws.properties";
 
-    protected static ObjectWriter jsonObjectWriter;
-    protected static ObjectMapper jsonObjectMapper;
+//    protected static ObjectWriter jsonObjectWriter;
+//    protected static ObjectMapper jsonObjectMapper;
 
 
 //    {
@@ -105,18 +103,45 @@ public class VariantVCFDownloader {
     @GET
     @Path("/attach")
     @Produces(MediaType.APPLICATION_OCTET_STREAM)
-    public Response attach(@QueryParam("dbname") String dbname) throws ClassNotFoundException, StorageManagerException, URISyntaxException, InstantiationException, IllegalAccessException, IOException {
+    public Response attach(@QueryParam("species") String species,
+                           @QueryParam("assembly") String assembly,
+                           @QueryParam("studyIds") String studyIds,
+                           @QueryParam("fileIds") String fileIds)
+            throws ClassNotFoundException, StorageManagerException, URISyntaxException, InstantiationException, IllegalAccessException, IOException {
+
+        // TODO: parameter validation and show usage if error
+
         startTime = System.currentTimeMillis();
+        logger.info("Starting at " + startTime);
 
-            VariantExporterController vec = new VariantExporterController(
-                    "hsapiens", dbname, Collections.singletonList("7"), Collections.singletonList("5"), "/tmp");
+        Properties properties = new Properties();
+        InputStream propertiesStream = getClass().getResourceAsStream(PROPERTIES);
+        if (propertiesStream == null) {
+            throw new IOException("properties file " + PROPERTIES + " not found. VariantExporter can not continue.");
+        }
+        properties.load(propertiesStream);
 
-            final List<String> files = vec.run();
-        logger.info("returning dumped vcf as " + files.get(0));
+        VariantExporterController vec = new VariantExporterController(
+                species,
+                getDbName(species, assembly),
+                Arrays.asList(studyIds.split(",")),
+                Arrays.asList(fileIds.split(",")),
+                properties.getProperty("VCFDownloaderOutputFolder"));
+
+        final List<String> files = vec.run();
+        logger.info("returning dumped vcf as \"" + files.get(0) + "\". Dump lasted " + Long.toString(System.currentTimeMillis() - startTime));
+
         return createOkResponse(new File(files.get(0)), MediaType.APPLICATION_OCTET_STREAM_TYPE, files.get(0));
     }
 
+    /**
+     * TODO: where should this go? This doesn't seem a good place
+     */
+    private String getDbName(String species, String assembly) {
+        return "eva_" + species + "_" + assembly;
+    }
 
+/*
     @GET
     @Path("/download")
     @Produces("text/plain")
@@ -130,18 +155,18 @@ public class VariantVCFDownloader {
 
             final List<String> files = vec.run();
             streamingOutput = new StreamingOutput() {
-               @Override
-                   public void write(OutputStream outputStream) throws IOException, WebApplicationException {
-                       BufferedOutputStream bufferedOutputStream = new BufferedOutputStream(outputStream);
-                       try {
-                           FileInputStream fileInputStream = new FileInputStream(files.get(0));
-                           byte[] buffer = IOUtils.toByteArray(fileInputStream);
-                           bufferedOutputStream.write(buffer);
-                       } catch (Exception e) {
-                           e.printStackTrace();
-                       }
-                   }
-               };
+                @Override
+                public void write(OutputStream outputStream) throws IOException, WebApplicationException {
+                    BufferedOutputStream bufferedOutputStream = new BufferedOutputStream(outputStream);
+                    try {
+                        FileInputStream fileInputStream = new FileInputStream(files.get(0));
+                        byte[] buffer = IOUtils.toByteArray(fileInputStream);
+                        bufferedOutputStream.write(buffer);
+                    } catch (Exception e) {
+                        e.printStackTrace();
+                    }
+                }
+            };
 
 
             logger.info("VariantVCFDownloader finished ok");
@@ -152,14 +177,14 @@ public class VariantVCFDownloader {
 
         return streamingOutput;
     }
-
+*/
     protected Response createJsonResponse(Object object) {
 //        try {
-            logger.info("on createJsonResponse, object=" + object.toString());
+        logger.info("on createJsonResponse, object=" + object.toString());
 //            String entity = jsonObjectWriter.writeValueAsString(object);  // doesn't work, glassfish cannot instanciate VariantVCFDownloader
-            Response.ResponseBuilder ok = Response.ok("{\"msg\":\"" + object.toString() + "\"}", MediaType.APPLICATION_JSON_TYPE);
-            Response response = buildResponse(ok);
-            return response;
+        Response.ResponseBuilder ok = Response.ok("{\"msg\":\"" + object.toString() + "\"}", MediaType.APPLICATION_JSON_TYPE);
+        Response response = buildResponse(ok);
+        return response;
 //        } catch (JsonProcessingException e) {
 //            System.out.println("object = " + object);
 //            System.out.println("((QueryResponse)object).getResponse() = " + ((QueryResponse) object).getResponse());
@@ -176,6 +201,7 @@ public class VariantVCFDownloader {
         queryResponse.setTime(new Long(endTime - startTime).intValue());
         queryResponse.setApiVersion(version);
 
+        logger.info("response duration: " + new Long(endTime - startTime).intValue());
         // Guarantee that the QueryResponse object contains a list of results
         List list;
         if (obj instanceof List) {
@@ -194,7 +220,7 @@ public class VariantVCFDownloader {
     protected Response createErrorResponse(Object o) {
         QueryResult<ObjectMap> result = new QueryResult();
         result.setErrorMsg(o.toString());
-        return createOkResponse(result);
+        return  createOkResponse(result);
     }
 
     protected Response createOkResponse(Object o1, MediaType o2) {
@@ -206,6 +232,9 @@ public class VariantVCFDownloader {
     }
 
     protected Response buildResponse(Response.ResponseBuilder responseBuilder) {
+        endTime = System.currentTimeMillis();
+        logger.info("finishing at " + endTime);
+        logger.info("response duration: " + Long.toString(endTime - startTime));
         return responseBuilder.header("Access-Control-Allow-Origin", "*").header("Access-Control-Allow-Headers", "x-requested-with, content-type").build();
     }
 }
