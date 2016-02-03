@@ -25,6 +25,7 @@ import org.opencb.opencga.storage.core.variant.VariantStorageManager;
 import org.opencb.opencga.storage.core.variant.adaptors.VariantDBAdaptor;
 import org.opencb.opencga.storage.core.variant.adaptors.VariantSourceDBAdaptor;
 
+import javax.ws.rs.core.MultivaluedMap;
 import java.io.IOException;
 import java.net.URI;
 import java.net.URISyntaxException;
@@ -44,12 +45,13 @@ public class VariantExporterController {
     private final VariantSourceDBAdaptor variantSourceDBAdaptor;
     private final QueryOptions query;
 
-    public VariantExporterController(String species, String dbName, List<String> studies, List<String> files, String outputDir)
+    public VariantExporterController(String species, String dbName, List<String> studies, List<String> files,
+                                     String outputDir, MultivaluedMap<String, String> queryParameters)
             throws IllegalAccessException, ClassNotFoundException, InstantiationException, StorageManagerException, URISyntaxException {
         this.outputDir = outputDir;
         cellBaseClient = getCellBaseClient(species);
         VariantDBAdaptor variantDBAdaptor = getVariantDBAdaptor(dbName);
-        query = getQuery(studies, files);
+        query = getQuery(studies, files, queryParameters);
         iterator = variantDBAdaptor.iterator(query);
         variantSourceDBAdaptor = variantDBAdaptor.getVariantSourceDBAdaptor();
     }
@@ -66,10 +68,21 @@ public class VariantExporterController {
         return variantStorageManager.getDBAdaptor(dbName, null);
     }
 
-    public QueryOptions getQuery(List<String> studies, List<String> files) {
+    public QueryOptions getQuery(List<String> studies, List<String> files, MultivaluedMap<String, String> queryParameters) {
         QueryOptions query = new QueryOptions();
         query.put(VariantDBAdaptor.FILES, files);
         query.put(VariantDBAdaptor.STUDIES, studies);
+
+        for (String acceptedValue : VariantDBAdaptor.QueryParams.acceptedValues) {
+            if (queryParameters.containsKey(acceptedValue)) {
+                List<String> values = queryParameters.get(acceptedValue);
+                String csv = values.get(0);
+                for (int i = 1; i < values.size(); i++) {
+                    csv += "," + values.get(i);
+                }
+                query.add(acceptedValue, csv);
+            }
+        }
         return query;
     }
 

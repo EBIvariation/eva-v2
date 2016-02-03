@@ -15,18 +15,11 @@
  */
 package embl.ebi.variation.eva.vcfDump;
 
-import org.opencb.cellbase.core.client.CellBaseClient;
-import org.opencb.datastore.core.QueryOptions;
 import org.opencb.opencga.lib.common.Config;
 import org.opencb.opencga.storage.core.StorageManagerException;
-import org.opencb.opencga.storage.core.StorageManagerFactory;
-import org.opencb.opencga.storage.core.variant.VariantStorageManager;
-import org.opencb.opencga.storage.core.variant.adaptors.VariantDBAdaptor;
-import org.opencb.opencga.storage.core.variant.adaptors.VariantDBIterator;
-import org.opencb.opencga.storage.core.variant.adaptors.VariantSourceDBAdaptor;
 
+import javax.ws.rs.core.MultivaluedHashMap;
 import java.io.IOException;
-import java.net.URI;
 import java.net.URISyntaxException;
 import java.util.Arrays;
 import java.util.List;
@@ -67,6 +60,7 @@ public class DumpMain {
             return;
         }
 
-        List<String> fileNames = new VariantExporterController(species, dbName, studies, files, outputDir).run();
+        List<String> fileNames = new VariantExporterController(
+                species, dbName, studies, files, outputDir, new MultivaluedHashMap<String, String>()).run();
     }
 }
