@@ -16,12 +16,7 @@
 package embl.ebi.variation.eva;
 
 
-import javax.servlet.http.HttpServletRequest;
-import javax.ws.rs.*;
-import javax.ws.rs.core.*;
-
 import embl.ebi.variation.eva.vcfDump.VariantExporterController;
-import org.apache.commons.io.IOUtils;
 import org.opencb.datastore.core.ObjectMap;
 import org.opencb.datastore.core.QueryOptions;
 import org.opencb.datastore.core.QueryResponse;
@@ -31,9 +26,17 @@ import org.opencb.opencga.storage.core.StorageManagerException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.io.*;
+import javax.servlet.http.HttpServletRequest;
+import javax.ws.rs.*;
+import javax.ws.rs.core.*;
+import java.io.File;
+import java.io.IOException;
+import java.io.InputStream;
 import java.net.URISyntaxException;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.List;
+import java.util.Properties;
 
 /**
  * Created by jmmut on 2016-01-22.
@@ -70,7 +73,7 @@ public class VariantVCFDownloader {
         this.version = version;
         this.uriInfo = uriInfo;
         this.params = uriInfo.getQueryParameters();
-        logger.debug(uriInfo.getRequestUri().toString());
+        logger.debug("requested: " + uriInfo.getRequestUri().toString());
         this.queryOptions = null;
         this.sessionIp = httpServletRequest.getRemoteAddr();
         Config.setOpenCGAHome(System.getenv("OPENCGA_HOME") != null ? System.getenv("OPENCGA_HOME") : "/opt/opencga");
@@ -84,22 +87,10 @@ public class VariantVCFDownloader {
         return buildResponse(Response.ok(message));
     }
 
-    @GET
-    @Path("/test")
-    @Produces("text/plain")
-    public Response info(@QueryParam("testString") String string) {
-        startTime = System.currentTimeMillis();
-        try {
-
-        } catch (Exception e) {
-            logger.error("VariantExporter failed: ", e);
-            return createErrorResponse(e.getMessage());
-        }
-        logger.info("VariantVCFDownloader finished ok");
-
-        return createJsonResponse("this is a mock of the response, testString = " + string);
-    }
-
+    /**
+     * example petition for downloading a vcf with some filters:
+     * http://localhost:8080/eva-ws/rest/attach?species=hsapiens&assembly=grch37&studyIds=7&fileIds=5&maf=%3C0.3&region=20:60000:65000
+     */
     @GET
     @Path("/attach")
     @Produces(MediaType.APPLICATION_OCTET_STREAM)
@@ -111,8 +102,7 @@ public class VariantVCFDownloader {
 
         // TODO: parameter validation and show usage if error
 
-        startTime = System.currentTimeMillis();
-        logger.info("Starting at " + startTime);
+//        startTime = System.currentTimeMillis();
 
         Properties properties = new Properties();
         InputStream propertiesStream = getClass().getResourceAsStream(PROPERTIES);
@@ -121,15 +111,19 @@ public class VariantVCFDownloader {
         }
         properties.load(propertiesStream);
 
+
+        MultivaluedMap<String, String> queryParameters = uriInfo.getQueryParameters();
+        logger.debug("queryParameters: " + queryParameters.toString());
         VariantExporterController vec = new VariantExporterController(
                 species,
                 getDbName(species, assembly),
                 Arrays.asList(studyIds.split(",")),
                 Arrays.asList(fileIds.split(",")),
-                properties.getProperty("VCFDownloaderOutputFolder"));
+                properties.getProperty("VCFDownloaderOutputFolder"),
+                queryParameters);
 
         final List<String> files = vec.run();
-        logger.info("returning dumped vcf as \"" + files.get(0) + "\". Dump lasted " + Long.toString(System.currentTimeMillis() - startTime));
+        logger.info("returning dumped vcf as \"" + files.get(0) + "\".");
 
         return createOkResponse(new File(files.get(0)), MediaType.APPLICATION_OCTET_STREAM_TYPE, files.get(0));
     }
@@ -141,43 +135,6 @@ public class VariantVCFDownloader {
         return "eva_" + species + "_" + assembly;
     }
 
-/*
-    @GET
-    @Path("/download")
-    @Produces("text/plain")
-    public StreamingOutput download(@QueryParam("dbname") String dbname)
-            throws ClassNotFoundException, StorageManagerException, URISyntaxException, InstantiationException, IllegalAccessException, IOException {
-        startTime = System.currentTimeMillis();
-        StreamingOutput streamingOutput = null;
-        try {
-            VariantExporterController vec = new VariantExporterController(
-                    "hsapiens", dbname, Collections.singletonList("7"), Collections.singletonList("5"), "/tmp");
-
-            final List<String> files = vec.run();
-            streamingOutput = new StreamingOutput() {
-                @Override
-                public void write(OutputStream outputStream) throws IOException, WebApplicationException {
-                    BufferedOutputStream bufferedOutputStream = new BufferedOutputStream(outputStream);
-                    try {
-                        FileInputStream fileInputStream = new FileInputStream(files.get(0));
-                        byte[] buffer = IOUtils.toByteArray(fileInputStream);
-                        bufferedOutputStream.write(buffer);
-                    } catch (Exception e) {
-                        e.printStackTrace();
-                    }
-                }
-            };
-
-
-            logger.info("VariantVCFDownloader finished ok");
-        } catch (Exception e) {
-            logger.error("VariantExporter failed: ", e);
-//            return createErrorResponse(e.getMessage());
-        }
-
-        return streamingOutput;
-    }
-*/
     protected Response createJsonResponse(Object object) {
 //        try {
         logger.info("on createJsonResponse, object=" + object.toString());
@@ -201,7 +158,6 @@ public class VariantVCFDownloader {
         queryResponse.setTime(new Long(endTime - startTime).intValue());
         queryResponse.setApiVersion(version);
 
-        logger.info("response duration: " + new Long(endTime - startTime).intValue());
         // Guarantee that the QueryResponse object contains a list of results
         List list;
         if (obj instanceof List) {
@@ -233,8 +189,7 @@ public class VariantVCFDownloader {
 
     protected Response buildResponse(Response.ResponseBuilder responseBuilder) {
         endTime = System.currentTimeMillis();
-        logger.info("finishing at " + endTime);
-        logger.info("response duration: " + Long.toString(endTime - startTime));
+        logger.debug("response completed in " + Long.toString(endTime - startTime) + " ms");
         return responseBuilder.header("Access-Control-Allow-Origin", "*").header("Access-Control-Allow-Headers", "x-requested-with, content-type").build();
     }
 }
