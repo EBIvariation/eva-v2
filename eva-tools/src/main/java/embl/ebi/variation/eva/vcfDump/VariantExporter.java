@@ -256,10 +256,10 @@ public class VariantExporter {
         Map<String, VariantContext> variantContextMap = new TreeMap<>();
         VariantContextBuilder variantContextBuilder = new VariantContextBuilder();
 
-        Integer start = variant.getStart();
-        Integer end = variant.getEnd();
         String reference = variant.getReference();
         String alternate = variant.getAlternate();
+        Integer start = variant.getStart();
+        Integer end = start + reference.length() -1;
         String filter = "PASS";
         List<String> allelesArray = Arrays.asList(reference, alternate);
         Map<String, List<Genotype>> genotypesPerStudy = new TreeMap<>();
