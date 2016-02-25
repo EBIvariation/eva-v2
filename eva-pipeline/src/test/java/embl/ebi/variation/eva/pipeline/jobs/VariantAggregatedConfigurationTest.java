@@ -15,6 +15,7 @@
  */
 package embl.ebi.variation.eva.pipeline.jobs;
 
+import embl.ebi.variation.eva.pipeline.listeners.JobParametersListener;
 import org.junit.AfterClass;
 import org.junit.BeforeClass;
 import org.junit.Test;
@@ -49,6 +50,8 @@ import static embl.ebi.variation.eva.pipeline.jobs.JobTestUtils.getTransformedOu
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
+import static embl.ebi.variation.eva.pipeline.listeners.JobParametersListener.*;
+import static embl.ebi.variation.eva.pipeline.steps.VariantsLoad.SKIP_LOAD;
 
 /**
  * Created by jmmut on 2015-10-14.
@@ -91,29 +94,29 @@ public class VariantAggregatedConfigurationTest {
         String dbName = VALID_TRANSFORM;
 
         JobParameters parameters = new JobParametersBuilder()
-                .addString("input", input)
-                .addString("outputDir", "/tmp")
-                .addString("dbName", dbName)
-                .addString("compressExtension", ".gz")
-                .addString("includeSrc", "FIRST_8_COLUMNS")
-                .addString("studyType", "COLLECTION")
-                .addString("studyName", "studyName")
-                .addString("studyId", "1")
-                .addString("fileId", "1")
-                .addString("opencga.app.home", opencgaHome)
-                .addString("aggregated", VariantSource.Aggregation.BASIC.toString())
-                .addString("includeStats", "false")
-                .addString("skipLoad", "true")
+                .addString(INPUT, input)
+                .addString(OUTPUT_DIR, "/tmp")
+                .addString(DB_NAME, dbName)
+                .addString(COMPRESS_EXTENSION, ".gz")
+                .addString(INCLUDE_SRC, "FIRST_8_COLUMNS")
+                .addString(STUDY_TYPE, "COLLECTION")
+                .addString(STUDY_NAME, "studyName")
+                .addString(STUDY_ID, "1")
+                .addString(FILE_ID, "1")
+                .addString(OPENCGA_APP_HOME, opencgaHome)
+                .addString(JobParametersListener.STUDY_AGGREGATED, VariantSource.Aggregation.BASIC.toString())
+                .addString(INCLUDE_STATS, "false")
+                .addString(SKIP_LOAD, "true")
                 .toJobParameters();
 
         JobExecution execution = jobLauncher.run(job, parameters);
 
-        assertEquals(input, execution.getJobParameters().getString("input"));
+        assertEquals(input, execution.getJobParameters().getString(INPUT));
         assertEquals(ExitStatus.COMPLETED.getExitCode(), execution.getExitStatus().getExitCode());
 
         ////////// check transformed file
         String outputFilename = getTransformedOutputPath(Paths.get(FILE_AGGREGATED).getFileName(),
-                parameters.getString("compressExtension"), parameters.getString("outputDir"));
+                parameters.getString(COMPRESS_EXTENSION), parameters.getString(OUTPUT_DIR));
         logger.info("reading transformed output from: " + outputFilename);
 
         long lines = getLines(new GZIPInputStream(new FileInputStream(outputFilename)));
@@ -127,24 +130,24 @@ public class VariantAggregatedConfigurationTest {
 //        String dbName = INVALID_TRANSFORM;
 //
 //        JobParameters parameters = new JobParametersBuilder()
-//                .addString("input", input)
-//                .addString("outputDir", "/tmp")
-//                .addString("dbName", dbName)
-//                .addString("compressExtension", ".gz")
-//                .addString("compressGenotypes", "true")
+//                .addString(INPUT, input)
+//                .addString("output.dir", "/tmp")
+//                .addString("db.name", dbName)
+//                .addString("compress.extension", ".gz")
+//                .addString("compress.genotypes", "true")
 //                .addString("includeSrc", "FIRST_8_COLUMNS")
 //                .addString("aggregated", "NONE")
-//                .addString("studyType", "COLLECTION")
-//                .addString("studyName", "studyName")
-//                .addString("studyId", "2")
-//                .addString("fileId", "2")
+//                .addString("study.type", "COLLECTION")
+//                .addString("study.name", "studyName")
+//                .addString("study.id", "2")
+//                .addString("file.id", "2")
 //                .addString("opencga.app.home", opencgaHome)
 //                .addString("skipLoad", "true")
 //                .toJobParameters();
 //
 //        JobExecution execution = jobLauncher.run(job, parameters);
 //
-//        assertEquals(input, execution.getJobParameters().getString("input"));
+//        assertEquals(input, execution.getJobParameters().getString(INPUT));
 //        assertEquals("FAILED", execution.getExitStatus().getExitCode());
 //    }
 
@@ -155,25 +158,24 @@ public class VariantAggregatedConfigurationTest {
         String dbName = VALID_LOAD;
 
         JobParameters parameters = new JobParametersBuilder()
-                .addString("input", input)
-                .addString("outputDir", "/tmp")
-                .addString("dbName", dbName)
-                .addString("compressExtension", ".gz")
-                .addString("compressGenotypes", "true")
-                .addString("includeSrc", "FIRST_8_COLUMNS")
-                .addString("aggregated", "NONE")
-                .addString("studyType", "COLLECTION")
-                .addString("studyName", "studyName")
-                .addString("studyId", "1")
-                .addString("fileId", "1")
-                .addString("aggregated", VariantSource.Aggregation.BASIC.toString())
-                .addString("includeStats", "false")
-                .addString("opencga.app.home", opencgaHome)
+                .addString(INPUT, input)
+                .addString(OUTPUT_DIR, "/tmp")
+                .addString(DB_NAME, dbName)
+                .addString(COMPRESS_EXTENSION, ".gz")
+                .addString(COMPRESS_GENOTYPES, "true")
+                .addString(INCLUDE_SRC, "FIRST_8_COLUMNS")
+                .addString(STUDY_TYPE, "COLLECTION")
+                .addString(STUDY_NAME, "studyName")
+                .addString(STUDY_ID, "1")
+                .addString(FILE_ID, "1")
+                .addString(STUDY_AGGREGATED, VariantSource.Aggregation.BASIC.toString())
+                .addString(INCLUDE_STATS, "false")
+                .addString(OPENCGA_APP_HOME, opencgaHome)
                 .toJobParameters();
 
         JobExecution execution = jobLauncher.run(job, parameters);
 
-        assertEquals(input, execution.getJobParameters().getString("input"));
+        assertEquals(input, execution.getJobParameters().getString(INPUT));
         assertEquals("COMPLETED", execution.getExitStatus().getExitCode());
 
         // check ((documents in DB) == (lines in transformed file))
@@ -182,7 +184,7 @@ public class VariantAggregatedConfigurationTest {
         VariantDBIterator iterator = variantDBAdaptor.iterator(new QueryOptions());
 
         String outputFilename = getTransformedOutputPath(Paths.get(FILE_AGGREGATED).getFileName(),
-                parameters.getString("compressExtension"), parameters.getString("outputDir"));
+                parameters.getString(COMPRESS_EXTENSION), parameters.getString(OUTPUT_DIR));
         long lines = getLines(new GZIPInputStream(new FileInputStream(outputFilename)));
 
         assertEquals(countRows(iterator), lines);
@@ -199,17 +201,17 @@ public class VariantAggregatedConfigurationTest {
 ////        String opencgaHome = System.getenv("OPENCGA_HOME") != null ? System.getenv("OPENCGA_HOME") : "/opt/opencga";  // TODO make it fail better
 //
 //        JobParameters parameters = new JobParametersBuilder()
-//                .addString("input", input)
-//                .addString("outputDir", outdir)
-//                .addString("dbName", dbName)
-//                .addString("compressExtension", ".gz")
-//                .addString("compressGenotypes", "true")
+//                .addString(INPUT, input)
+//                .addString("output.dir", outdir)
+//                .addString("db.name", dbName)
+//                .addString("compress.extension", ".gz")
+//                .addString("compress.genotypes", "true")
 //                .addString("includeSrc", "FIRST_8_COLUMNS")
 //                .addString("aggregated", "NONE")
-//                .addString("studyType", "COLLECTION")
-//                .addString("studyName", "studyName")
-//                .addString("studyId", "1")
-//                .addString("fileId", "1")
+//                .addString("study.type", "COLLECTION")
+//                .addString("study.name", "studyName")
+//                .addString("study.id", "1")
+//                .addString("file.id", "1")
 //                .addString("opencga.app.home", null)
 //                .toJobParameters();
 //
@@ -223,7 +225,7 @@ public class VariantAggregatedConfigurationTest {
 //        System.out.println("parameters in load tests" + parameters.toString());
 //        JobExecution execution = jobLauncher.run(listenedJob, parameters);
 //
-//        assertEquals(input, execution.getJobParameters().getString("input"));
+//        assertEquals(input, execution.getJobParameters().getString(INPUT));
 //        assertEquals("FAILED", execution.getExitStatus().getExitCode());
 //    }
 
@@ -234,25 +236,25 @@ public class VariantAggregatedConfigurationTest {
         String dbName = VALID_LOAD_STATS;
 
         JobParameters parameters = new JobParametersBuilder()
-                .addString("input", input)
-                .addString("outputDir", "/tmp")
-                .addString("dbName", dbName)
-                .addString("compressExtension", ".gz")
-                .addString("compressGenotypes", "true")
-                .addString("includeSrc", "FIRST_8_COLUMNS")
-                .addString("aggregated", "NONE")
-                .addString("studyType", "COLLECTION")
-                .addString("studyName", "studyName")
-                .addString("studyId", "1")
-                .addString("fileId", "1")
-                .addString("aggregated", VariantSource.Aggregation.BASIC.toString())
-                .addString("includeStats", "true")
-                .addString("opencga.app.home", opencgaHome)
+                .addString(INPUT, input)
+                .addString(OUTPUT_DIR, "/tmp")
+                .addString(DB_NAME, dbName)
+                .addString(COMPRESS_EXTENSION, ".gz")
+                .addString(COMPRESS_GENOTYPES, "true")
+                .addString(INCLUDE_SRC, "FIRST_8_COLUMNS")
+                .addString(STUDY_AGGREGATED, "NONE")
+                .addString(STUDY_TYPE, "COLLECTION")
+                .addString(STUDY_NAME, "studyName")
+                .addString(STUDY_ID, "1")
+                .addString(FILE_ID, "1")
+                .addString(STUDY_AGGREGATED, VariantSource.Aggregation.BASIC.toString())
+                .addString(INCLUDE_STATS, "true")
+                .addString(OPENCGA_APP_HOME, opencgaHome)
                 .toJobParameters();
 
         JobExecution execution = jobLauncher.run(job, parameters);
 
-        assertEquals(input, execution.getJobParameters().getString("input"));
+        assertEquals(input, execution.getJobParameters().getString(INPUT));
         assertEquals("COMPLETED", execution.getExitStatus().getExitCode());
 
         // check ((documents in DB) == (lines in transformed file))
@@ -261,7 +263,7 @@ public class VariantAggregatedConfigurationTest {
         VariantDBIterator iterator = variantDBAdaptor.iterator(new QueryOptions());
 
         String outputFilename = getTransformedOutputPath(Paths.get(FILE_AGGREGATED).getFileName(),
-                parameters.getString("compressExtension"), parameters.getString("outputDir"));
+                parameters.getString(COMPRESS_EXTENSION), parameters.getString(OUTPUT_DIR));
         long lines = getLines(new GZIPInputStream(new FileInputStream(outputFilename)));
 
         assertEquals(countRows(iterator), lines);

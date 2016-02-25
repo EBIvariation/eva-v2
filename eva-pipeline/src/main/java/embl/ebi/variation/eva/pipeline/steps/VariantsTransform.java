@@ -31,6 +31,8 @@ import java.net.URI;
 import java.net.URISyntaxException;
 import java.nio.file.Paths;
 
+import static embl.ebi.variation.eva.pipeline.listeners.JobParametersListener.*;
+
 /**
  * Created by jmmut on 2015-11-10.
  *
@@ -49,11 +51,11 @@ public class VariantsTransform implements Tasklet {
         JobParameters parameters = chunkContext.getStepContext().getStepExecution().getJobParameters();
         ObjectMap variantOptions = listener.getVariantOptions();
 
-        URI outdirUri = createUri(parameters.getString("outputDir"));
-        URI nextFileUri = createUri(parameters.getString("input"));
-        URI pedigreeUri = parameters.getString("pedigree") != null ? createUri(parameters.getString("pedigree")) : null;
+        URI outdirUri = createUri(parameters.getString(OUTPUT_DIR));
+        URI nextFileUri = createUri(parameters.getString(INPUT));
+        URI pedigreeUri = parameters.getString(PEDIGREE) != null ? createUri(parameters.getString(PEDIGREE)) : null;
 
-        logger.info("transform file " + parameters.getString("input") + " to " + parameters.getString("outputDir"));
+        logger.info("transform file " + parameters.getString(INPUT) + " to " + parameters.getString(OUTPUT_DIR));
 
         logger.info("Extract variants '{}'", nextFileUri);
         VariantStorageManager variantStorageManager = StorageManagerFactory.getVariantStorageManager();

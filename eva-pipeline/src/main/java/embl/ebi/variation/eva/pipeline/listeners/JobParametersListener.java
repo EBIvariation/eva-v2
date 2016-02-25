@@ -28,10 +28,25 @@ import org.springframework.batch.core.JobParameters;
 import org.springframework.stereotype.Component;
 
 
-public class JobParametersListener implements JobExecutionListener {
+public abstract class JobParametersListener implements JobExecutionListener {
      
     private static final Logger logger = LoggerFactory.getLogger(JobParametersListener.class);
-    
+
+    public static final String DB_NAME = "db.name";
+    public static final String COMPRESS_GENOTYPES = "compress.genotypes";
+    public static final String INPUT = "input";
+    public static final String PEDIGREE = "pedigree";
+    public static final String OUTPUT_DIR = "output.dir";
+    public static final String FILE_ID = "file.id";
+    public static final String STUDY_ID = "study.id";
+    public static final String STUDY_NAME = "study.name";
+    public static final String STUDY_TYPE = "study.type";
+    public static final String STUDY_AGGREGATED = "study.aggregated";
+    public static final String INCLUDE_SRC = "include.src";
+    public static final String INCLUDE_STATS = "include.stats";
+    public static final String COMPRESS_EXTENSION = "compress.extension";
+    public static final String OPENCGA_APP_HOME = "opencga.app.home";
+
     protected final ObjectMap variantOptions;
     
     public JobParametersListener() {
@@ -42,70 +57,6 @@ public class JobParametersListener implements JobExecutionListener {
     public void afterJob(JobExecution jobExecution) {
         logger.info("afterJob STATUS + " + jobExecution.getStatus());
         logger.info("afterJob : " + jobExecution);
-    }
-
-    @Override
-    public void beforeJob(JobExecution jobExecution) {
-        JobParameters parameters = jobExecution.getJobParameters();
-        
-        logger.info("beforeJob : STARTING");
-        logger.info("beforeJob JobParameters : " + parameters);
-        
-        // TODO validation checks for all the parameters
-        Config.setOpenCGAHome(parameters.getString("opencga.app.home"));
-
-        // VariantsLoad configuration
-        VariantSource source = new VariantSource(
-                parameters.getString("input"), 
-                parameters.getString("fileId"),
-                parameters.getString("studyId"), 
-                parameters.getString("studyName"), 
-                VariantStudy.StudyType.valueOf(parameters.getString("studyType")), 
-                VariantSource.Aggregation.NONE);
-        variantOptions.put(VariantStorageManager.VARIANT_SOURCE, source);
-
-        // TODO get samples
-//                System.out.println(config.samples);
-//                System.out.println(config.samples.size());
-//                if (config.samples.size() != -3) {
-//                    throw new Exception("aborting");
-//                }
-//                variantOptions.put(VariantStorageManager.SAMPLE_IDS, Arrays.asList(config.samples.split(",")));
-        
-        variantOptions.put(VariantStorageManager.CALCULATE_STATS, false);   // this is tested by hand
-//                variantOptions.put(VariantStorageManager.OVERWRITE_STATS, config.overwriteStats);
-        variantOptions.put(VariantStorageManager.INCLUDE_STATS, false);
-        
-//                variantOptions.put(VariantStorageManager.INCLUDE_GENOTYPES.key(), false);   // TODO rename samples to genotypes
-        variantOptions.put(VariantStorageManager.INCLUDE_SAMPLES, true);   // TODO rename samples to genotypes
-        variantOptions.put(VariantStorageManager.INCLUDE_SRC, VariantStorageManager.IncludeSrc.parse(parameters.getString("includeSrc")));
-        variantOptions.put(VariantStorageManager.COMPRESS_GENOTYPES, Boolean.parseBoolean(parameters.getString("compressGenotypes")));
-        
-//                variantOptions.put(VariantStorageManager.AGGREGATED_TYPE, VariantSource.Aggregation.NONE);
-        variantOptions.put(VariantStorageManager.DB_NAME, parameters.getString("dbName"));
-        variantOptions.put(VariantStorageManager.ANNOTATE, false);
-//                variantOptions.put(MongoDBVariantStorageManager.LOAD_THREADS, config.loadThreads);
-        variantOptions.put("compressExtension", parameters.getString("compressExtension"));
-
-        logger.debug("Using as variantOptions: {}", variantOptions.entrySet().toString());
-        logger.debug("Using as input: {}", parameters.getString("input"));
-                
-//                String storageEngine = parameters.getString("storageEngine");
-//                variantStorageManager = StorageManagerFactory.getVariantStorageManager(storageEngine);
-//
-////                if (config.credentials != null && !config.credentials.isEmpty()) {
-////                    variantStorageManager.addConfigUri(new URI(null, config.credentials, null));
-////                }
-                
-//                Path input = Paths.get(nextFileUri.getPath());
-//                output = Paths.get(outdirUri.getPath());
-//                outputVariantJsonFile = output.resolve(input.getFileName().toString() + ".variants.json" + config.compressExtension);
-////                outputFileJsonFile = output.resolve(input.getFileName().toString() + ".file.json" + config.compressExtension);
-//                transformedVariantsUri = outdirUri.resolve(outputVariantJsonFile.getFileName().toString());
-//
-//                // stats config
-////                statsOutputUri = outdirUri.resolve(VariantStorageManager.buildFilename(source) + "." + TimeUtils.getTime());  // TODO why was the timestamp required?
-//                statsOutputUri = outdirUri.resolve(VariantStorageManager.buildFilename(source));
     }
     
     public ObjectMap getVariantOptions() {

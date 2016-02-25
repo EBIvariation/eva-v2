@@ -35,6 +35,8 @@ import java.net.URI;
 import java.net.URISyntaxException;
 import java.nio.file.Paths;
 
+import static embl.ebi.variation.eva.pipeline.listeners.JobParametersListener.*;
+
 /**
  * Created by jmmut on 2015-11-10.
  *
@@ -44,7 +46,7 @@ public class VariantsStatsLoad implements Tasklet {
     private static final Logger logger = LoggerFactory.getLogger(VariantsStatsLoad.class);
 
     //    public static final String annotJobName = "variantAnnotationJob";
-    public static final String SKIP_STATS_LOAD = "skipStatsLoad";
+    public static final String SKIP_STATS_LOAD = "skip.stats.load";
     private JobParametersListener listener;
 
     public VariantsStatsLoad(JobParametersListener listener) {
@@ -63,8 +65,8 @@ public class VariantsStatsLoad implements Tasklet {
             ObjectMap variantOptions = listener.getVariantOptions();
             QueryOptions statsOptions = new QueryOptions(variantOptions);
             VariantStatisticsManager variantStatisticsManager = new VariantStatisticsManager();
-            VariantDBAdaptor dbAdaptor = variantStorageManager.getDBAdaptor(variantOptions.getString("dbName"), variantOptions);
-            URI outdirUri = createUri(parameters.getString("outputDir"));
+            VariantDBAdaptor dbAdaptor = variantStorageManager.getDBAdaptor(variantOptions.getString(DB_NAME), variantOptions);
+            URI outdirUri = createUri(parameters.getString(OUTPUT_DIR));
             VariantSource variantSource = variantOptions.get(VariantStorageManager.VARIANT_SOURCE, VariantSource.class);
             URI statsOutputUri = outdirUri.resolve(VariantStorageManager.buildFilename(variantSource));
 

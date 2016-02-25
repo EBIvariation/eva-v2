@@ -39,6 +39,7 @@ import org.springframework.test.context.junit4.SpringJUnit4ClassRunner;
 import java.io.*;
 import java.net.UnknownHostException;
 import static org.junit.Assert.*;
+import static embl.ebi.variation.eva.pipeline.listeners.JobParametersListener.*;
 
 /**
  * Created by jmmut on 2015-10-14.
@@ -80,24 +81,24 @@ public class VariantStatsConfigurationTest {
         String outputDir = "/tmp";
 
         JobParameters parameters = new JobParametersBuilder()
-                .addString("input", input)
-                .addString("outputDir", outputDir)
-                .addString("dbName", dbName)
-                .addString("compressExtension", compressExtension)
-                .addString("compressGenotypes", "true")
-                .addString("includeSrc", "FIRST_8_COLUMNS")
-                .addString("aggregated", "NONE")
-                .addString("studyType", "COLLECTION")
-                .addString("studyName", source.getStudyName())
-                .addString("studyId", source.getStudyId())
-                .addString("fileId", source.getFileId())
-                .addString("opencga.app.home", opencgaHome)
+                .addString(INPUT, input)
+                .addString(OUTPUT_DIR, outputDir)
+                .addString(DB_NAME, dbName)
+                .addString(COMPRESS_EXTENSION, compressExtension)
+                .addString(COMPRESS_GENOTYPES, "true")
+                .addString(INCLUDE_SRC, "FIRST_8_COLUMNS")
+                .addString(STUDY_AGGREGATED, "NONE")
+                .addString(STUDY_TYPE, "COLLECTION")
+                .addString(STUDY_NAME, source.getStudyName())
+                .addString(STUDY_ID, source.getStudyId())
+                .addString(FILE_ID, source.getFileId())
+                .addString(OPENCGA_APP_HOME, opencgaHome)
                 .addString(VariantsStatsLoad.SKIP_STATS_LOAD, "true")
                 .toJobParameters();
 
         JobExecution execution = jobLauncher.run(job, parameters);
 
-        assertEquals(input, execution.getJobParameters().getString("input"));
+        assertEquals(input, execution.getJobParameters().getString(INPUT));
         assertEquals(ExitStatus.FAILED.getExitCode(), execution.getExitStatus().getExitCode());
     }
 
@@ -113,18 +114,18 @@ public class VariantStatsConfigurationTest {
         String outputDir = input;
 
         JobParameters jobParameters = new JobParametersBuilder()
-                .addString("input", input)
-                .addString("outputDir", outputDir)
-                .addString("dbName", dbName)
-                .addString("compressExtension", compressExtension)
-                .addString("compressGenotypes", "true")
-                .addString("includeSrc", "FIRST_8_COLUMNS")
-                .addString("aggregated", "NONE")
-                .addString("studyType", "COLLECTION")
-                .addString("studyName", source.getStudyName())
-                .addString("studyId", source.getStudyId())
-                .addString("fileId", source.getFileId())
-                .addString("opencga.app.home", opencgaHome)
+                .addString(INPUT, input)
+                .addString(OUTPUT_DIR, outputDir)
+                .addString(DB_NAME, dbName)
+                .addString(COMPRESS_EXTENSION, compressExtension)
+                .addString(COMPRESS_GENOTYPES, "true")
+                .addString(INCLUDE_SRC, "FIRST_8_COLUMNS")
+                .addString(STUDY_AGGREGATED, "NONE")
+                .addString(STUDY_TYPE, "COLLECTION")
+                .addString(STUDY_NAME, source.getStudyName())
+                .addString(STUDY_ID, source.getStudyId())
+                .addString(FILE_ID, source.getFileId())
+                .addString(OPENCGA_APP_HOME, opencgaHome)
                 .addString(VariantsStatsCreate.SKIP_STATS_CREATE, "true")
                 .toJobParameters();
 
@@ -152,24 +153,24 @@ public class VariantStatsConfigurationTest {
         String outputDir = input;
 
         JobParameters parameters = new JobParametersBuilder()
-                .addString("input", input)
-                .addString("outputDir", outputDir)
-                .addString("dbName", dbName)
-                .addString("compressExtension", compressExtension)
-                .addString("compressGenotypes", "true")
-                .addString("includeSrc", "FIRST_8_COLUMNS")
-                .addString("aggregated", "NONE")
-                .addString("studyType", "COLLECTION")
-                .addString("studyName", source.getStudyName())
-                .addString("studyId", source.getStudyId())
-                .addString("fileId", source.getFileId())
-                .addString("opencga.app.home", opencgaHome)
+                .addString(INPUT, input)
+                .addString(OUTPUT_DIR, outputDir)
+                .addString(DB_NAME, dbName)
+                .addString(COMPRESS_EXTENSION, compressExtension)
+                .addString(COMPRESS_GENOTYPES, "true")
+                .addString(INCLUDE_SRC, "FIRST_8_COLUMNS")
+                .addString(STUDY_AGGREGATED, "NONE")
+                .addString(STUDY_TYPE, "COLLECTION")
+                .addString(STUDY_NAME, source.getStudyName())
+                .addString(STUDY_ID, source.getStudyId())
+                .addString(FILE_ID, source.getFileId())
+                .addString(OPENCGA_APP_HOME, opencgaHome)
                 .addString(VariantsStatsCreate.SKIP_STATS_CREATE, "true")
                 .toJobParameters();
 
         JobExecution execution = jobLauncher.run(job, parameters);
 
-        assertEquals(input, execution.getJobParameters().getString("input"));
+        assertEquals(input, execution.getJobParameters().getString(INPUT));
         assertEquals(ExitStatus.FAILED.getExitCode(), execution.getExitStatus().getExitCode());
     }
 

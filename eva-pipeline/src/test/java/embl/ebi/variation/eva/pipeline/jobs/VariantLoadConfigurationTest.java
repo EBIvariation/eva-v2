@@ -56,6 +56,7 @@ import java.util.zip.GZIPInputStream;
 
 import static embl.ebi.variation.eva.pipeline.jobs.JobTestUtils.*;
 import static org.junit.Assert.*;
+import static embl.ebi.variation.eva.pipeline.listeners.JobParametersListener.*;
 
 /**
  * Created by jmmut on 2015-10-14.
@@ -93,25 +94,25 @@ public class VariantLoadConfigurationTest {
         String dbName = VALID_LOAD;
         
         JobParameters parameters = new JobParametersBuilder()
-                .addString("input", input)
-                .addString("outputDir", Paths.get(input).getParent().toString())    // reusing transformed path in resources
-                .addString("dbName", dbName)
-                .addString("compressExtension", ".gz")
-                .addString("compressGenotypes", "true")
-                .addString("includeSrc", "FIRST_8_COLUMNS")
-                .addString("aggregated", "NONE")
-                .addString("studyType", "COLLECTION")
-                .addString("studyName", "studyName")
-                .addString("studyId", "7")
-                .addString("fileId", "10")
-                .addString("opencga.app.home", opencgaHome)
+                .addString(INPUT, input)
+                .addString(OUTPUT_DIR, Paths.get(input).getParent().toString())    // reusing transformed path in resources
+                .addString(DB_NAME, dbName)
+                .addString(COMPRESS_EXTENSION, ".gz")
+                .addString(COMPRESS_GENOTYPES, "true")
+                .addString(INCLUDE_SRC, "FIRST_8_COLUMNS")
+                .addString(STUDY_AGGREGATED, "NONE")
+                .addString(STUDY_TYPE, "COLLECTION")
+                .addString(STUDY_NAME, "studyName")
+                .addString(STUDY_ID, "7")
+                .addString(FILE_ID, "10")
+                .addString(OPENCGA_APP_HOME, opencgaHome)
                 .addString(VariantsStatsCreate.SKIP_STATS_CREATE, "true")
                 .addString(VariantsStatsLoad.SKIP_STATS_LOAD, "true")
                 .toJobParameters();
 
         JobExecution execution = jobLauncher.run(job, parameters);
 
-        assertEquals(input, execution.getJobParameters().getString("input"));
+        assertEquals(input, execution.getJobParameters().getString(INPUT));
         assertEquals(ExitStatus.COMPLETED.getExitCode(), execution.getExitStatus().getExitCode());
 
 
@@ -121,7 +122,7 @@ public class VariantLoadConfigurationTest {
         VariantDBIterator iterator = variantDBAdaptor.iterator(new QueryOptions());
 
         String outputFilename = getTransformedOutputPath(Paths.get(FILE_20).getFileName(),
-                parameters.getString("compressExtension"), parameters.getString("outputDir"));
+                parameters.getString(COMPRESS_EXTENSION), parameters.getString(OUTPUT_DIR));
         long lines = getLines(new GZIPInputStream(new FileInputStream(outputFilename)));
 
         assertEquals(countRows(iterator), lines);
@@ -138,18 +139,18 @@ public class VariantLoadConfigurationTest {
 //        String opencgaHome = System.getenv("OPENCGA_HOME") != null ? System.getenv("OPENCGA_HOME") : "/opt/opencga";  // TODO make it fail better
 
         JobParameters parameters = new JobParametersBuilder()
-                .addString("input", input)
-                .addString("outputDir", outdir)
-                .addString("dbName", dbName)
-                .addString("compressExtension", ".gz")
-                .addString("compressGenotypes", "true")
-                .addString("includeSrc", "FIRST_8_COLUMNS")
-                .addString("aggregated", "NONE")
-                .addString("studyType", "COLLECTION")
-                .addString("studyName", "studyName")
-                .addString("studyId", "1")
-                .addString("fileId", "1")
-                .addString("opencga.app.home", null)
+                .addString(INPUT, input)
+                .addString(OUTPUT_DIR, outdir)
+                .addString(DB_NAME, dbName)
+                .addString(COMPRESS_EXTENSION, ".gz")
+                .addString(COMPRESS_GENOTYPES, "true")
+                .addString(INCLUDE_SRC, "FIRST_8_COLUMNS")
+                .addString(STUDY_AGGREGATED, "NONE")
+                .addString(STUDY_TYPE, "COLLECTION")
+                .addString(STUDY_NAME, "studyName")
+                .addString(STUDY_ID, "1")
+                .addString(FILE_ID, "1")
+                .addString(OPENCGA_APP_HOME, null)
                 .addString(VariantsStatsCreate.SKIP_STATS_CREATE, "true")
                 .addString(VariantsStatsLoad.SKIP_STATS_LOAD, "true")
                 .toJobParameters();
@@ -157,7 +158,7 @@ public class VariantLoadConfigurationTest {
         System.out.println("parameters in load tests" + parameters.toString());
         JobExecution execution = jobLauncher.run(job, parameters);
 
-        assertEquals(input, execution.getJobParameters().getString("input"));
+        assertEquals(input, execution.getJobParameters().getString(INPUT));
         assertEquals(ExitStatus.FAILED.getExitCode(), execution.getExitStatus().getExitCode());
     }
 

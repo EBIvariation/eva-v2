@@ -33,6 +33,8 @@ import java.net.URISyntaxException;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 
+import static embl.ebi.variation.eva.pipeline.listeners.JobParametersListener.*;
+
 /**
  * Created by jmmut on 2015-11-10.
  *
@@ -42,7 +44,7 @@ public class VariantsLoad implements Tasklet {
     private static final Logger logger = LoggerFactory.getLogger(VariantsLoad.class);
 
     private JobParametersListener listener;
-    public static final String SKIP_LOAD = "skipLoad";
+    public static final String SKIP_LOAD = "skip.load";
 
     public VariantsLoad(JobParametersListener listener) {
         this.listener = listener;
@@ -57,12 +59,12 @@ public class VariantsLoad implements Tasklet {
             logger.info("skipping load step, requested " + SKIP_LOAD + "=" + parameters.getString(SKIP_LOAD));
         } else {
             VariantStorageManager variantStorageManager = StorageManagerFactory.getVariantStorageManager();// TODO add mongo
-            URI outdirUri = createUri(parameters.getString("outputDir"));
-            URI nextFileUri = createUri(parameters.getString("input"));
-            URI pedigreeUri = parameters.getString("pedigree") != null ? createUri(parameters.getString("pedigree")) : null;
+            URI outdirUri = createUri(parameters.getString(OUTPUT_DIR));
+            URI nextFileUri = createUri(parameters.getString(INPUT));
+            URI pedigreeUri = parameters.getString(PEDIGREE) != null ? createUri(parameters.getString(PEDIGREE)) : null;
             Path output = Paths.get(outdirUri.getPath());
             Path input = Paths.get(nextFileUri.getPath());
-            Path outputVariantJsonFile = output.resolve(input.getFileName().toString() + ".variants.json" + parameters.getString("compressExtension"));
+            Path outputVariantJsonFile = output.resolve(input.getFileName().toString() + ".variants.json" + parameters.getString(COMPRESS_EXTENSION));
 //                outputFileJsonFile = output.resolve(input.getFileName().toString() + ".file.json" + config.compressExtension);
             URI transformedVariantsUri = outdirUri.resolve(outputVariantJsonFile.getFileName().toString());
 

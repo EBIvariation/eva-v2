@@ -17,13 +17,11 @@ package embl.ebi.variation.eva.pipeline.listeners;
 
 import org.opencb.biodata.models.variant.VariantSource;
 import org.opencb.biodata.models.variant.VariantStudy;
-import org.opencb.datastore.core.ObjectMap;
 import org.opencb.opencga.lib.common.Config;
 import org.opencb.opencga.storage.core.variant.VariantStorageManager;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.batch.core.JobExecution;
-import org.springframework.batch.core.JobExecutionListener;
 import org.springframework.batch.core.JobParameters;
 import org.springframework.stereotype.Component;
 
@@ -43,16 +41,16 @@ public class AggregatedJobParametersListener extends JobParametersListener {
         logger.info("beforeJob JobParameters : " + parameters);
 
         // TODO validation checks for all the parameters
-        Config.setOpenCGAHome(parameters.getString("opencga.app.home"));
+        Config.setOpenCGAHome(parameters.getString(OPENCGA_APP_HOME));
 
         // Load configuration
         VariantSource source = new VariantSource(
-                parameters.getString("input"),
-                parameters.getString("fileId"),
-                parameters.getString("studyId"),
-                parameters.getString("studyName"),
-                VariantStudy.StudyType.valueOf(parameters.getString("studyType")),
-                VariantSource.Aggregation.valueOf(parameters.getString("aggregated")));
+                parameters.getString(INPUT),
+                parameters.getString(FILE_ID),
+                parameters.getString(STUDY_ID),
+                parameters.getString(STUDY_NAME),
+                VariantStudy.StudyType.valueOf(parameters.getString(STUDY_TYPE)),
+                VariantSource.Aggregation.valueOf(parameters.getString(STUDY_AGGREGATED)));
         if (VariantSource.Aggregation.NONE.equals(source.getAggregation())) {
             source.setAggregation(VariantSource.Aggregation.BASIC);
         }
@@ -74,17 +72,17 @@ public class AggregatedJobParametersListener extends JobParametersListener {
         
 //                variantOptions.put(VariantStorageManager.INCLUDE_GENOTYPES.key(), false);   // TODO rename samples to genotypes
         variantOptions.put(VariantStorageManager.INCLUDE_SAMPLES, false);   // TODO rename samples to genotypes
-        variantOptions.put(VariantStorageManager.INCLUDE_SRC, VariantStorageManager.IncludeSrc.parse(parameters.getString("includeSrc")));
+        variantOptions.put(VariantStorageManager.INCLUDE_SRC, VariantStorageManager.IncludeSrc.parse(parameters.getString(INCLUDE_SRC)));
         variantOptions.put(VariantStorageManager.COMPRESS_GENOTYPES, false);
         
 //                variantOptions.put(VariantStorageManager.AGGREGATED_TYPE, VariantSource.Aggregation.NONE);
-        variantOptions.put(VariantStorageManager.DB_NAME, parameters.getString("dbName"));
+        variantOptions.put(VariantStorageManager.DB_NAME, parameters.getString(DB_NAME));
         variantOptions.put(VariantStorageManager.ANNOTATE, false);
 //                variantOptions.put(MongoDBVariantStorageManager.LOAD_THREADS, config.loadThreads);
-        variantOptions.put("compressExtension", parameters.getString("compressExtension"));
+        variantOptions.put("compressExtension", parameters.getString(COMPRESS_EXTENSION));
 
         logger.debug("Using as variantOptions: {}", variantOptions.entrySet().toString());
-        logger.debug("Using as input: {}", parameters.getString("input"));
+        logger.debug("Using as input: {}", parameters.getString(INPUT));
                 
 //                String storageEngine = parameters.getString("storageEngine");
 //                variantStorageManager = StorageManagerFactory.getVariantStorageManager(storageEngine);

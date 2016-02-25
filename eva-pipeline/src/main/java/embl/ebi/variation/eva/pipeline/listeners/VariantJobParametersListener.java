@@ -40,15 +40,15 @@ public class VariantJobParametersListener extends JobParametersListener {
         logger.info("beforeJob JobParameters : " + parameters);
         
         // TODO validation checks for all the parameters
-        Config.setOpenCGAHome(parameters.getString("opencga.app.home"));
+        Config.setOpenCGAHome(parameters.getString(OPENCGA_APP_HOME));
 
         // VariantsLoad configuration
         VariantSource source = new VariantSource(
-                parameters.getString("input"), 
-                parameters.getString("fileId"),
-                parameters.getString("studyId"), 
-                parameters.getString("studyName"), 
-                VariantStudy.StudyType.valueOf(parameters.getString("studyType")), 
+                parameters.getString(INPUT),
+                parameters.getString(FILE_ID),
+                parameters.getString(STUDY_ID),
+                parameters.getString(STUDY_NAME),
+                VariantStudy.StudyType.valueOf(parameters.getString(STUDY_TYPE)),
                 VariantSource.Aggregation.NONE);
         variantOptions.put(VariantStorageManager.VARIANT_SOURCE, source);
 
@@ -62,21 +62,21 @@ public class VariantJobParametersListener extends JobParametersListener {
         
         variantOptions.put(VariantStorageManager.CALCULATE_STATS, false);   // this is tested by hand
 //                variantOptions.put(VariantStorageManager.OVERWRITE_STATS, config.overwriteStats);
-        variantOptions.put(VariantStorageManager.INCLUDE_STATS, false);
+        variantOptions.put(VariantStorageManager.INCLUDE_STATS, parameters.getString(INCLUDE_STATS));
         
 //                variantOptions.put(VariantStorageManager.INCLUDE_GENOTYPES.key(), false);   // TODO rename samples to genotypes
         variantOptions.put(VariantStorageManager.INCLUDE_SAMPLES, true);   // TODO rename samples to genotypes
-        variantOptions.put(VariantStorageManager.INCLUDE_SRC, VariantStorageManager.IncludeSrc.parse(parameters.getString("includeSrc")));
-        variantOptions.put(VariantStorageManager.COMPRESS_GENOTYPES, Boolean.parseBoolean(parameters.getString("compressGenotypes")));
+        variantOptions.put(VariantStorageManager.INCLUDE_SRC, VariantStorageManager.IncludeSrc.parse(parameters.getString(INCLUDE_SRC)));
+        variantOptions.put(VariantStorageManager.COMPRESS_GENOTYPES, Boolean.parseBoolean(parameters.getString(COMPRESS_GENOTYPES)));
         
 //                variantOptions.put(VariantStorageManager.AGGREGATED_TYPE, VariantSource.Aggregation.NONE);
-        variantOptions.put(VariantStorageManager.DB_NAME, parameters.getString("dbName"));
+        variantOptions.put(VariantStorageManager.DB_NAME, parameters.getString(DB_NAME));
         variantOptions.put(VariantStorageManager.ANNOTATE, false);
 //                variantOptions.put(MongoDBVariantStorageManager.LOAD_THREADS, config.loadThreads);
-        variantOptions.put("compressExtension", parameters.getString("compressExtension"));
+        variantOptions.put("compressExtension", parameters.getString(COMPRESS_EXTENSION));
 
         logger.debug("Using as variantOptions: {}", variantOptions.entrySet().toString());
-        logger.debug("Using as input: {}", parameters.getString("input"));
+        logger.debug("Using as input: {}", parameters.getString(INPUT));
                 
 //                String storageEngine = parameters.getString("storageEngine");
 //                variantStorageManager = StorageManagerFactory.getVariantStorageManager(storageEngine);

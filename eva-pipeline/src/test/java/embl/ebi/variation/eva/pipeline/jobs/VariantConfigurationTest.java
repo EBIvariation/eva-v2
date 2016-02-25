@@ -47,6 +47,7 @@ import static embl.ebi.variation.eva.pipeline.jobs.JobTestUtils.*;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
+import static embl.ebi.variation.eva.pipeline.listeners.JobParametersListener.*;
 
 /**
  * Created by jmmut on 2015-10-14.
@@ -86,25 +87,25 @@ public class VariantConfigurationTest {
         String dbName = VALID_TRANSFORM;
 
         JobParameters parameters = new JobParametersBuilder()
-                .addString("input", input)
-                .addString("outputDir", "/tmp")
-                .addString("dbName", dbName)
-                .addString("compressExtension", ".gz")
-                .addString("compressGenotypes", "true")
-                .addString("includeSrc", "FIRST_8_COLUMNS")
-                .addString("aggregated", "NONE")
-                .addString("studyType", "COLLECTION")
-                .addString("studyName", "studyName")
-                .addString("studyId", "1")
-                .addString("fileId", "1")
-                .addString("opencga.app.home", opencgaHome)
+                .addString(INPUT, input)
+                .addString(OUTPUT_DIR, "/tmp")
+                .addString(DB_NAME, dbName)
+                .addString(COMPRESS_EXTENSION, ".gz")
+                .addString(COMPRESS_GENOTYPES, "true")
+                .addString(INCLUDE_SRC, "FIRST_8_COLUMNS")
+                .addString(STUDY_AGGREGATED, "NONE")
+                .addString(STUDY_TYPE, "COLLECTION")
+                .addString(STUDY_NAME, "studyName")
+                .addString(STUDY_ID, "1")
+                .addString(FILE_ID, "1")
+                .addString(OPENCGA_APP_HOME, opencgaHome)
                 .addString(VariantsLoad.SKIP_LOAD, "true")
                 .addString(VariantsStatsCreate.SKIP_STATS_CREATE, "true")
                 .addString(VariantsStatsLoad.SKIP_STATS_LOAD, "true")
                 .toJobParameters();
 
         String outputFilename = getTransformedOutputPath(Paths.get(FILE_20).getFileName(),
-                parameters.getString("compressExtension"), parameters.getString("outputDir"));
+                parameters.getString(COMPRESS_EXTENSION), parameters.getString(OUTPUT_DIR));
         logger.info("transformed output will be at: " + outputFilename);
         File file = new File(outputFilename);
         file.delete();
@@ -112,7 +113,7 @@ public class VariantConfigurationTest {
 
         JobExecution execution = jobLauncher.run(job, parameters);
 
-        assertEquals(input, execution.getJobParameters().getString("input"));
+        assertEquals(input, execution.getJobParameters().getString(INPUT));
         assertEquals(ExitStatus.COMPLETED.getExitCode(), execution.getExitStatus().getExitCode());
 
         ////////// check transformed file
@@ -131,18 +132,18 @@ public class VariantConfigurationTest {
         String dbName = INVALID_TRANSFORM;
 
         JobParameters parameters = new JobParametersBuilder()
-                .addString("input", input)
-                .addString("outputDir", "/tmp")
-                .addString("dbName", dbName)
-                .addString("compressExtension", ".gz")
-                .addString("compressGenotypes", "true")
-                .addString("includeSrc", "FIRST_8_COLUMNS")
-                .addString("aggregated", "NONE")
-                .addString("studyType", "COLLECTION")
-                .addString("studyName", "studyName")
-                .addString("studyId", "2")
-                .addString("fileId", "2")
-                .addString("opencga.app.home", opencgaHome)
+                .addString(INPUT, input)
+                .addString(OUTPUT_DIR, "/tmp")
+                .addString(DB_NAME, dbName)
+                .addString(COMPRESS_EXTENSION, ".gz")
+                .addString(COMPRESS_GENOTYPES, "true")
+                .addString(INCLUDE_SRC, "FIRST_8_COLUMNS")
+                .addString(STUDY_AGGREGATED, "NONE")
+                .addString(STUDY_TYPE, "COLLECTION")
+                .addString(STUDY_NAME, "studyName")
+                .addString(STUDY_ID, "2")
+                .addString(FILE_ID, "2")
+                .addString(OPENCGA_APP_HOME, opencgaHome)
                 .addString(VariantsLoad.SKIP_LOAD, "true")
                 .addString(VariantsStatsCreate.SKIP_STATS_CREATE, "true")
                 .addString(VariantsStatsLoad.SKIP_STATS_LOAD, "true")
@@ -150,7 +151,7 @@ public class VariantConfigurationTest {
 
         JobExecution execution = jobLauncher.run(job, parameters);
 
-        assertEquals(input, execution.getJobParameters().getString("input"));
+        assertEquals(input, execution.getJobParameters().getString(INPUT));
         assertEquals(ExitStatus.FAILED.getExitCode(), execution.getExitStatus().getExitCode());
     }
 
@@ -162,25 +163,25 @@ public class VariantConfigurationTest {
         String dbName = VALID_LOAD;
 
         JobParameters parameters = new JobParametersBuilder()
-                .addString("input", input)
-                .addString("outputDir", "/tmp")
-                .addString("dbName", dbName)
-                .addString("compressExtension", ".gz")
-                .addString("compressGenotypes", "true")
-                .addString("includeSrc", "FIRST_8_COLUMNS")
-                .addString("aggregated", "NONE")
-                .addString("studyType", "COLLECTION")
-                .addString("studyName", "studyName")
-                .addString("studyId", "1")
-                .addString("fileId", "1")
-                .addString("opencga.app.home", opencgaHome)
+                .addString(INPUT, input)
+                .addString(OUTPUT_DIR, "/tmp")
+                .addString(DB_NAME, dbName)
+                .addString(COMPRESS_EXTENSION, ".gz")
+                .addString(COMPRESS_GENOTYPES, "true")
+                .addString(INCLUDE_SRC, "FIRST_8_COLUMNS")
+                .addString(STUDY_AGGREGATED, "NONE")
+                .addString(STUDY_TYPE, "COLLECTION")
+                .addString(STUDY_NAME, "studyName")
+                .addString(STUDY_ID, "1")
+                .addString(FILE_ID, "1")
+                .addString(OPENCGA_APP_HOME, opencgaHome)
                 .addString(VariantsStatsCreate.SKIP_STATS_CREATE, "true")
                 .addString(VariantsStatsLoad.SKIP_STATS_LOAD, "true")
                 .toJobParameters();
 
         JobExecution execution = jobLauncher.run(job, parameters);
 
-        assertEquals(input, execution.getJobParameters().getString("input"));
+        assertEquals(input, execution.getJobParameters().getString(INPUT));
         assertEquals(ExitStatus.COMPLETED.getExitCode(), execution.getExitStatus().getExitCode());
 
         // check ((documents in DB) == (lines in transformed file))
@@ -189,7 +190,7 @@ public class VariantConfigurationTest {
         VariantDBIterator iterator = variantDBAdaptor.iterator(new QueryOptions());
 
         String outputFilename = getTransformedOutputPath(Paths.get(FILE_20).getFileName(),
-                parameters.getString("compressExtension"), parameters.getString("outputDir"));
+                parameters.getString(COMPRESS_EXTENSION), parameters.getString(OUTPUT_DIR));
         long lines = getLines(new GZIPInputStream(new FileInputStream(outputFilename)));
 
         assertEquals(countRows(iterator), lines);
@@ -208,18 +209,18 @@ public class VariantConfigurationTest {
         File statsFile = new File(Paths.get(outputDir).resolve(VariantStorageManager.buildFilename(source)) + ".variants.stats.json.gz");
 
         JobParameters parameters = new JobParametersBuilder()
-                .addString("input", input)
-                .addString("outputDir", outputDir)
-                .addString("dbName", dbName)
-                .addString("compressExtension", compressExtension)
-                .addString("compressGenotypes", "true")
-                .addString("includeSrc", "FIRST_8_COLUMNS")
-                .addString("aggregated", "NONE")
-                .addString("studyType", "COLLECTION")
-                .addString("studyName", source.getStudyName())
-                .addString("studyId", source.getStudyId())
-                .addString("fileId", source.getFileId())
-                .addString("opencga.app.home", opencgaHome)
+                .addString(INPUT, input)
+                .addString(OUTPUT_DIR, outputDir)
+                .addString(DB_NAME, dbName)
+                .addString(COMPRESS_EXTENSION, compressExtension)
+                .addString(COMPRESS_GENOTYPES, "true")
+                .addString(INCLUDE_SRC, "FIRST_8_COLUMNS")
+                .addString(STUDY_AGGREGATED, "NONE")
+                .addString(STUDY_TYPE, "COLLECTION")
+                .addString(STUDY_NAME, source.getStudyName())
+                .addString(STUDY_ID, source.getStudyId())
+                .addString(FILE_ID, source.getFileId())
+                .addString(OPENCGA_APP_HOME, opencgaHome)
                 .addString(VariantsStatsLoad.SKIP_STATS_LOAD, "true")
                 .toJobParameters();
 
@@ -227,7 +228,7 @@ public class VariantConfigurationTest {
         assertFalse(statsFile.exists());  // ensure the stats file doesn't exist from previous executions
         JobExecution execution = jobLauncher.run(job, parameters);
 
-        assertEquals(input, execution.getJobParameters().getString("input"));
+        assertEquals(input, execution.getJobParameters().getString(INPUT));
         assertEquals(ExitStatus.COMPLETED.getExitCode(), execution.getExitStatus().getExitCode());
         assertTrue(statsFile.exists());
     }
@@ -245,25 +246,25 @@ public class VariantConfigurationTest {
         File statsFile = new File(Paths.get(outputDir).resolve(VariantStorageManager.buildFilename(source)) + ".variants.stats.json.gz");
 
         JobParameters parameters = new JobParametersBuilder()
-                .addString("input", input)
-                .addString("outputDir", outputDir)
-                .addString("dbName", dbName)
-                .addString("compressExtension", compressExtension)
-                .addString("compressGenotypes", "true")
-                .addString("includeSrc", "FIRST_8_COLUMNS")
-                .addString("aggregated", "NONE")
-                .addString("studyType", "COLLECTION")
-                .addString("studyName", source.getStudyName())
-                .addString("studyId", source.getStudyId())
-                .addString("fileId", source.getFileId())
-                .addString("opencga.app.home", opencgaHome)
+                .addString(INPUT, input)
+                .addString(OUTPUT_DIR, outputDir)
+                .addString(DB_NAME, dbName)
+                .addString(COMPRESS_EXTENSION, compressExtension)
+                .addString(COMPRESS_GENOTYPES, "true")
+                .addString(INCLUDE_SRC, "FIRST_8_COLUMNS")
+                .addString(STUDY_AGGREGATED, "NONE")
+                .addString(STUDY_TYPE, "COLLECTION")
+                .addString(STUDY_NAME, source.getStudyName())
+                .addString(STUDY_ID, source.getStudyId())
+                .addString(FILE_ID, source.getFileId())
+                .addString(OPENCGA_APP_HOME, opencgaHome)
                 .toJobParameters();
 
         statsFile.delete();
         assertFalse(statsFile.exists());  // ensure the stats file doesn't exist from previous executions
         JobExecution execution = jobLauncher.run(job, parameters);
 
-        assertEquals(input, execution.getJobParameters().getString("input"));
+        assertEquals(input, execution.getJobParameters().getString(INPUT));
         assertEquals(ExitStatus.COMPLETED.getExitCode(), execution.getExitStatus().getExitCode());
         assertTrue(statsFile.exists());
 
@@ -273,7 +274,7 @@ public class VariantConfigurationTest {
         VariantDBIterator iterator = variantDBAdaptor.iterator(new QueryOptions());
 
         String outputFilename = getTransformedOutputPath(Paths.get(FILE_20).getFileName(),
-                parameters.getString("compressExtension"), parameters.getString("outputDir"));
+                parameters.getString(COMPRESS_EXTENSION), parameters.getString(OUTPUT_DIR));
         long lines = getLines(new GZIPInputStream(new FileInputStream(outputFilename)));
 
         assertEquals(countRows(iterator), lines);
