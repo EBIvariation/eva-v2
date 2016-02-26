@@ -25,15 +25,11 @@ import org.opencb.opencga.storage.core.variant.adaptors.VariantDBAdaptor;
 import org.opencb.opencga.storage.core.variant.adaptors.VariantDBIterator;
 import org.opencb.opencga.storage.core.variant.adaptors.VariantSourceDBAdaptor;
 
-import java.io.FileNotFoundException;
-import java.io.FileOutputStream;
 import java.io.IOException;
-import java.io.OutputStream;
 import java.net.URI;
 import java.net.URISyntaxException;
 import java.util.Arrays;
 import java.util.List;
-import java.util.zip.GZIPOutputStream;
 
 /**
  * Created by jmmut on 2015-10-28.
@@ -53,7 +49,6 @@ public class DumpMain {
 
         Config.setOpenCGAHome(System.getenv("OPENCGA_HOME") != null ? System.getenv("OPENCGA_HOME") : "/opt/opencga");
 
-        QueryOptions query = new QueryOptions();
         List<String> files;         // = Arrays.asList("5");
         List<String> studies;       // = Arrays.asList("7");
         String dbName;              // = "batch";
@@ -71,21 +66,7 @@ public class DumpMain {
             System.out.println("example: java -jar eva-tools-0.1.jar hsapiens batch 7 5,6 ./");
             return;
         }
-        query.put(VariantDBAdaptor.FILES, files);
-        query.put(VariantDBAdaptor.STUDIES, studies);
 
-
-        VariantStorageManager variantStorageManager = StorageManagerFactory.getVariantStorageManager();
-        VariantDBAdaptor variantDBAdaptor = variantStorageManager.getDBAdaptor(dbName, null);
-        VariantDBIterator iterator = variantDBAdaptor.iterator(query);
-        VariantSourceDBAdaptor variantSourceDBAdaptor = variantDBAdaptor.getVariantSourceDBAdaptor();
-        String url = (String) Config.getStorageProperties().get("CELLBASE.REST.URL");
-        String version = (String) Config.getStorageProperties().get("CELLBASE.VERSION");
-
-
-        CellBaseClient cellBaseClient = new CellBaseClient(new URI(url), version, species);
-
-
-        List<String> fileNames = new VariantExporter(cellBaseClient).VcfHtsExport(iterator, outputDir, variantSourceDBAdaptor, query);
+        List<String> fileNames = new VariantExporterController(species, dbName, studies, files, outputDir).run();
     }
 }

@@ -138,6 +138,7 @@ public class VariantExporter {
 
         // actual loop
         int failedVariants = 0;
+        int writtenVariants = 0;
         while (iterator.hasNext()) {
             Variant variant = iterator.next();
             try {
@@ -149,12 +150,17 @@ public class VariantExporter {
                 }
             } catch (Exception e) {
                 logger.info(String.format("Variant dump failed: \"%s:%d:%s>%s\"", variant.getChromosome(),
-                                variant.getStart(), variant.getReference(), variant.getAlternate()),
+                        variant.getStart(), variant.getReference(), variant.getAlternate()),
                         e);
                 failedVariants++;
             }
+            writtenVariants++;
+            if (writtenVariants % 1000000 == 0) {
+                logger.info("written variants: " + writtenVariants);
+            }
         }
 
+        logger.info("total variants written: " + writtenVariants);
         if (failedVariants > 0) {
             logger.warn(failedVariants + " variants were not written due to errors");
         }
@@ -250,10 +256,10 @@ public class VariantExporter {
         Map<String, VariantContext> variantContextMap = new TreeMap<>();
         VariantContextBuilder variantContextBuilder = new VariantContextBuilder();
 
-        Integer start = variant.getStart();
-        Integer end = variant.getEnd();
         String reference = variant.getReference();
         String alternate = variant.getAlternate();
+        Integer start = variant.getStart();
+        Integer end = start + reference.length() -1;
         String filter = "PASS";
         List<String> allelesArray = Arrays.asList(reference, alternate);
         Map<String, List<Genotype>> genotypesPerStudy = new TreeMap<>();
