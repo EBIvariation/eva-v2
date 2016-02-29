@@ -46,7 +46,7 @@ public class VariantsStatsCreate implements Tasklet {
     private static final Logger logger = LoggerFactory.getLogger(VariantsStatsCreate.class);
 
     private JobParametersListener listener;
-    public static final String SKIP_STATS_CREATE = "skip.stats.create";
+    public static final String SKIP_STATS_CREATE = "stats.skip.create";
 
     public VariantsStatsCreate(JobParametersListener listener) {
         this.listener = listener;
@@ -64,8 +64,8 @@ public class VariantsStatsCreate implements Tasklet {
             ObjectMap variantOptions = listener.getVariantOptions();
             VariantStorageManager variantStorageManager = StorageManagerFactory.getVariantStorageManager();
             VariantSource variantSource = variantOptions.get(VariantStorageManager.VARIANT_SOURCE, VariantSource.class);
-            VariantDBAdaptor dbAdaptor = variantStorageManager.getDBAdaptor(variantOptions.getString(DB_NAME), variantOptions);
-            URI outdirUri = createUri(parameters.getString(OUTPUT_DIR));
+            VariantDBAdaptor dbAdaptor = variantStorageManager.getDBAdaptor(variantOptions.getString(VariantStorageManager.DB_NAME), variantOptions);
+            URI outdirUri = createUri(parameters.getString(STORAGE_OUTPUT_DIR));
             URI statsOutputUri = outdirUri.resolve(VariantStorageManager.buildFilename(variantSource));
 
             VariantStatisticsManager variantStatisticsManager = new VariantStatisticsManager();

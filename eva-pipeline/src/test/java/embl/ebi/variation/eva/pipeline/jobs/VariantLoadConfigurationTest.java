@@ -15,17 +15,12 @@
  */
 package embl.ebi.variation.eva.pipeline.jobs;
 
-import com.mongodb.DB;
-import com.mongodb.MongoClient;
-import embl.ebi.variation.eva.pipeline.steps.VariantsLoad;
 import embl.ebi.variation.eva.pipeline.steps.VariantsStatsCreate;
 import embl.ebi.variation.eva.pipeline.steps.VariantsStatsLoad;
 import org.junit.AfterClass;
 import org.junit.BeforeClass;
 import org.junit.Test;
 import org.junit.runner.RunWith;
-import org.opencb.biodata.models.variant.Variant;
-import org.opencb.biodata.models.variant.VariantSource;
 import org.opencb.datastore.core.QueryOptions;
 import org.opencb.opencga.storage.core.StorageManagerException;
 import org.opencb.opencga.storage.core.StorageManagerFactory;
@@ -35,23 +30,14 @@ import org.opencb.opencga.storage.core.variant.adaptors.VariantDBIterator;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.batch.core.*;
-import org.springframework.batch.core.configuration.annotation.JobBuilderFactory;
 import org.springframework.batch.core.launch.JobLauncher;
-import org.springframework.batch.core.repository.JobExecutionAlreadyRunningException;
-import org.springframework.batch.core.repository.JobInstanceAlreadyCompleteException;
-import org.springframework.batch.core.repository.JobRestartException;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.test.context.ContextConfiguration;
 import org.springframework.test.context.junit4.SpringJUnit4ClassRunner;
 
 import java.io.*;
 import java.net.UnknownHostException;
-import java.nio.file.Path;
 import java.nio.file.Paths;
-import java.util.Arrays;
-import java.util.Iterator;
-import java.util.List;
 import java.util.zip.GZIPInputStream;
 
 import static embl.ebi.variation.eva.pipeline.jobs.JobTestUtils.*;
@@ -95,11 +81,11 @@ public class VariantLoadConfigurationTest {
         
         JobParameters parameters = new JobParametersBuilder()
                 .addString(INPUT, input)
-                .addString(OUTPUT_DIR, Paths.get(input).getParent().toString())    // reusing transformed path in resources
+                .addString(STORAGE_OUTPUT_DIR, Paths.get(input).getParent().toString())    // reusing transformed path in resources
                 .addString(DB_NAME, dbName)
-                .addString(COMPRESS_EXTENSION, ".gz")
-                .addString(COMPRESS_GENOTYPES, "true")
-                .addString(INCLUDE_SRC, "FIRST_8_COLUMNS")
+                .addString(STORAGE_COMPRESS_EXTENSION, ".gz")
+                .addString(STORAGE_COMPRESS_GENOTYPES, "true")
+                .addString(STORAGE_INCLUDE_SRC, "FIRST_8_COLUMNS")
                 .addString(STUDY_AGGREGATED, "NONE")
                 .addString(STUDY_TYPE, "COLLECTION")
                 .addString(STUDY_NAME, "studyName")
@@ -122,7 +108,7 @@ public class VariantLoadConfigurationTest {
         VariantDBIterator iterator = variantDBAdaptor.iterator(new QueryOptions());
 
         String outputFilename = getTransformedOutputPath(Paths.get(FILE_20).getFileName(),
-                parameters.getString(COMPRESS_EXTENSION), parameters.getString(OUTPUT_DIR));
+                parameters.getString(STORAGE_COMPRESS_EXTENSION), parameters.getString(STORAGE_OUTPUT_DIR));
         long lines = getLines(new GZIPInputStream(new FileInputStream(outputFilename)));
 
         assertEquals(countRows(iterator), lines);
@@ -140,11 +126,11 @@ public class VariantLoadConfigurationTest {
 
         JobParameters parameters = new JobParametersBuilder()
                 .addString(INPUT, input)
-                .addString(OUTPUT_DIR, outdir)
+                .addString(STORAGE_OUTPUT_DIR, outdir)
                 .addString(DB_NAME, dbName)
-                .addString(COMPRESS_EXTENSION, ".gz")
-                .addString(COMPRESS_GENOTYPES, "true")
-                .addString(INCLUDE_SRC, "FIRST_8_COLUMNS")
+                .addString(STORAGE_COMPRESS_EXTENSION, ".gz")
+                .addString(STORAGE_COMPRESS_GENOTYPES, "true")
+                .addString(STORAGE_INCLUDE_SRC, "FIRST_8_COLUMNS")
                 .addString(STUDY_AGGREGATED, "NONE")
                 .addString(STUDY_TYPE, "COLLECTION")
                 .addString(STUDY_NAME, "studyName")

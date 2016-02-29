@@ -44,7 +44,7 @@ public class VariantsLoad implements Tasklet {
     private static final Logger logger = LoggerFactory.getLogger(VariantsLoad.class);
 
     private JobParametersListener listener;
-    public static final String SKIP_LOAD = "skip.load";
+    public static final String SKIP_LOAD = "load.skip";
 
     public VariantsLoad(JobParametersListener listener) {
         this.listener = listener;
@@ -59,12 +59,12 @@ public class VariantsLoad implements Tasklet {
             logger.info("skipping load step, requested " + SKIP_LOAD + "=" + parameters.getString(SKIP_LOAD));
         } else {
             VariantStorageManager variantStorageManager = StorageManagerFactory.getVariantStorageManager();// TODO add mongo
-            URI outdirUri = createUri(parameters.getString(OUTPUT_DIR));
+            URI outdirUri = createUri(parameters.getString(STORAGE_OUTPUT_DIR));
             URI nextFileUri = createUri(parameters.getString(INPUT));
             URI pedigreeUri = parameters.getString(PEDIGREE) != null ? createUri(parameters.getString(PEDIGREE)) : null;
             Path output = Paths.get(outdirUri.getPath());
             Path input = Paths.get(nextFileUri.getPath());
-            Path outputVariantJsonFile = output.resolve(input.getFileName().toString() + ".variants.json" + parameters.getString(COMPRESS_EXTENSION));
+            Path outputVariantJsonFile = output.resolve(input.getFileName().toString() + ".variants.json" + parameters.getString(STORAGE_COMPRESS_EXTENSION));
 //                outputFileJsonFile = output.resolve(input.getFileName().toString() + ".file.json" + config.compressExtension);
             URI transformedVariantsUri = outdirUri.resolve(outputVariantJsonFile.getFileName().toString());
 

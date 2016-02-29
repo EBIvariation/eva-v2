@@ -88,11 +88,11 @@ public class VariantConfigurationTest {
 
         JobParameters parameters = new JobParametersBuilder()
                 .addString(INPUT, input)
-                .addString(OUTPUT_DIR, "/tmp")
+                .addString(STORAGE_OUTPUT_DIR, "/tmp")
                 .addString(DB_NAME, dbName)
-                .addString(COMPRESS_EXTENSION, ".gz")
-                .addString(COMPRESS_GENOTYPES, "true")
-                .addString(INCLUDE_SRC, "FIRST_8_COLUMNS")
+                .addString(STORAGE_COMPRESS_EXTENSION, ".gz")
+                .addString(STORAGE_COMPRESS_GENOTYPES, "true")
+                .addString(STORAGE_INCLUDE_SRC, "FIRST_8_COLUMNS")
                 .addString(STUDY_AGGREGATED, "NONE")
                 .addString(STUDY_TYPE, "COLLECTION")
                 .addString(STUDY_NAME, "studyName")
@@ -105,7 +105,7 @@ public class VariantConfigurationTest {
                 .toJobParameters();
 
         String outputFilename = getTransformedOutputPath(Paths.get(FILE_20).getFileName(),
-                parameters.getString(COMPRESS_EXTENSION), parameters.getString(OUTPUT_DIR));
+                parameters.getString(STORAGE_COMPRESS_EXTENSION), parameters.getString(STORAGE_OUTPUT_DIR));
         logger.info("transformed output will be at: " + outputFilename);
         File file = new File(outputFilename);
         file.delete();
@@ -133,11 +133,11 @@ public class VariantConfigurationTest {
 
         JobParameters parameters = new JobParametersBuilder()
                 .addString(INPUT, input)
-                .addString(OUTPUT_DIR, "/tmp")
+                .addString(STORAGE_OUTPUT_DIR, "/tmp")
                 .addString(DB_NAME, dbName)
-                .addString(COMPRESS_EXTENSION, ".gz")
-                .addString(COMPRESS_GENOTYPES, "true")
-                .addString(INCLUDE_SRC, "FIRST_8_COLUMNS")
+                .addString(STORAGE_COMPRESS_EXTENSION, ".gz")
+                .addString(STORAGE_COMPRESS_GENOTYPES, "true")
+                .addString(STORAGE_INCLUDE_SRC, "FIRST_8_COLUMNS")
                 .addString(STUDY_AGGREGATED, "NONE")
                 .addString(STUDY_TYPE, "COLLECTION")
                 .addString(STUDY_NAME, "studyName")
@@ -164,11 +164,11 @@ public class VariantConfigurationTest {
 
         JobParameters parameters = new JobParametersBuilder()
                 .addString(INPUT, input)
-                .addString(OUTPUT_DIR, "/tmp")
+                .addString(STORAGE_OUTPUT_DIR, "/tmp")
                 .addString(DB_NAME, dbName)
-                .addString(COMPRESS_EXTENSION, ".gz")
-                .addString(COMPRESS_GENOTYPES, "true")
-                .addString(INCLUDE_SRC, "FIRST_8_COLUMNS")
+                .addString(STORAGE_COMPRESS_EXTENSION, ".gz")
+                .addString(STORAGE_COMPRESS_GENOTYPES, "true")
+                .addString(STORAGE_INCLUDE_SRC, "FIRST_8_COLUMNS")
                 .addString(STUDY_AGGREGATED, "NONE")
                 .addString(STUDY_TYPE, "COLLECTION")
                 .addString(STUDY_NAME, "studyName")
@@ -190,7 +190,7 @@ public class VariantConfigurationTest {
         VariantDBIterator iterator = variantDBAdaptor.iterator(new QueryOptions());
 
         String outputFilename = getTransformedOutputPath(Paths.get(FILE_20).getFileName(),
-                parameters.getString(COMPRESS_EXTENSION), parameters.getString(OUTPUT_DIR));
+                parameters.getString(STORAGE_COMPRESS_EXTENSION), parameters.getString(STORAGE_OUTPUT_DIR));
         long lines = getLines(new GZIPInputStream(new FileInputStream(outputFilename)));
 
         assertEquals(countRows(iterator), lines);
@@ -210,11 +210,11 @@ public class VariantConfigurationTest {
 
         JobParameters parameters = new JobParametersBuilder()
                 .addString(INPUT, input)
-                .addString(OUTPUT_DIR, outputDir)
+                .addString(STORAGE_OUTPUT_DIR, outputDir)
                 .addString(DB_NAME, dbName)
-                .addString(COMPRESS_EXTENSION, compressExtension)
-                .addString(COMPRESS_GENOTYPES, "true")
-                .addString(INCLUDE_SRC, "FIRST_8_COLUMNS")
+                .addString(STORAGE_COMPRESS_EXTENSION, compressExtension)
+                .addString(STORAGE_COMPRESS_GENOTYPES, "true")
+                .addString(STORAGE_INCLUDE_SRC, "FIRST_8_COLUMNS")
                 .addString(STUDY_AGGREGATED, "NONE")
                 .addString(STUDY_TYPE, "COLLECTION")
                 .addString(STUDY_NAME, source.getStudyName())
@@ -247,11 +247,11 @@ public class VariantConfigurationTest {
 
         JobParameters parameters = new JobParametersBuilder()
                 .addString(INPUT, input)
-                .addString(OUTPUT_DIR, outputDir)
+                .addString(STORAGE_OUTPUT_DIR, outputDir)
                 .addString(DB_NAME, dbName)
-                .addString(COMPRESS_EXTENSION, compressExtension)
-                .addString(COMPRESS_GENOTYPES, "true")
-                .addString(INCLUDE_SRC, "FIRST_8_COLUMNS")
+                .addString(STORAGE_COMPRESS_EXTENSION, compressExtension)
+                .addString(STORAGE_COMPRESS_GENOTYPES, "true")
+                .addString(STORAGE_INCLUDE_SRC, "FIRST_8_COLUMNS")
                 .addString(STUDY_AGGREGATED, "NONE")
                 .addString(STUDY_TYPE, "COLLECTION")
                 .addString(STUDY_NAME, source.getStudyName())
@@ -274,7 +274,7 @@ public class VariantConfigurationTest {
         VariantDBIterator iterator = variantDBAdaptor.iterator(new QueryOptions());
 
         String outputFilename = getTransformedOutputPath(Paths.get(FILE_20).getFileName(),
-                parameters.getString(COMPRESS_EXTENSION), parameters.getString(OUTPUT_DIR));
+                parameters.getString(STORAGE_COMPRESS_EXTENSION), parameters.getString(STORAGE_OUTPUT_DIR));
         long lines = getLines(new GZIPInputStream(new FileInputStream(outputFilename)));
 
         assertEquals(countRows(iterator), lines);

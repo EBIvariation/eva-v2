@@ -17,13 +17,11 @@ package embl.ebi.variation.eva.pipeline.listeners;
 
 import org.opencb.biodata.models.variant.VariantSource;
 import org.opencb.biodata.models.variant.VariantStudy;
-import org.opencb.datastore.core.ObjectMap;
 import org.opencb.opencga.lib.common.Config;
 import org.opencb.opencga.storage.core.variant.VariantStorageManager;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.batch.core.JobExecution;
-import org.springframework.batch.core.JobExecutionListener;
 import org.springframework.batch.core.JobParameters;
 import org.springframework.stereotype.Component;
 
@@ -44,7 +42,7 @@ public class VariantJobParametersListener extends JobParametersListener {
 
         // VariantsLoad configuration
         VariantSource source = new VariantSource(
-                parameters.getString(INPUT),
+                parameters.getString(INPUT),    // TODO remove path, leave only filename
                 parameters.getString(FILE_ID),
                 parameters.getString(STUDY_ID),
                 parameters.getString(STUDY_NAME),
@@ -62,18 +60,18 @@ public class VariantJobParametersListener extends JobParametersListener {
         
         variantOptions.put(VariantStorageManager.CALCULATE_STATS, false);   // this is tested by hand
 //                variantOptions.put(VariantStorageManager.OVERWRITE_STATS, config.overwriteStats);
-        variantOptions.put(VariantStorageManager.INCLUDE_STATS, parameters.getString(INCLUDE_STATS));
+        variantOptions.put(VariantStorageManager.INCLUDE_STATS, parameters.getString(STATS_INCLUDE));
         
 //                variantOptions.put(VariantStorageManager.INCLUDE_GENOTYPES.key(), false);   // TODO rename samples to genotypes
         variantOptions.put(VariantStorageManager.INCLUDE_SAMPLES, true);   // TODO rename samples to genotypes
-        variantOptions.put(VariantStorageManager.INCLUDE_SRC, VariantStorageManager.IncludeSrc.parse(parameters.getString(INCLUDE_SRC)));
-        variantOptions.put(VariantStorageManager.COMPRESS_GENOTYPES, Boolean.parseBoolean(parameters.getString(COMPRESS_GENOTYPES)));
+        variantOptions.put(VariantStorageManager.INCLUDE_SRC, VariantStorageManager.IncludeSrc.parse(parameters.getString(STORAGE_INCLUDE_SRC)));
+        variantOptions.put(VariantStorageManager.COMPRESS_GENOTYPES, Boolean.parseBoolean(parameters.getString(STORAGE_COMPRESS_GENOTYPES)));
         
 //                variantOptions.put(VariantStorageManager.AGGREGATED_TYPE, VariantSource.Aggregation.NONE);
         variantOptions.put(VariantStorageManager.DB_NAME, parameters.getString(DB_NAME));
         variantOptions.put(VariantStorageManager.ANNOTATE, false);
 //                variantOptions.put(MongoDBVariantStorageManager.LOAD_THREADS, config.loadThreads);
-        variantOptions.put("compressExtension", parameters.getString(COMPRESS_EXTENSION));
+        variantOptions.put("compressExtension", parameters.getString(STORAGE_COMPRESS_EXTENSION));
 
         logger.debug("Using as variantOptions: {}", variantOptions.entrySet().toString());
         logger.debug("Using as input: {}", parameters.getString(INPUT));

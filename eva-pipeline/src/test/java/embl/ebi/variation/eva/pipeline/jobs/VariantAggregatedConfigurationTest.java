@@ -95,17 +95,17 @@ public class VariantAggregatedConfigurationTest {
 
         JobParameters parameters = new JobParametersBuilder()
                 .addString(INPUT, input)
-                .addString(OUTPUT_DIR, "/tmp")
+                .addString(STORAGE_OUTPUT_DIR, "/tmp")
                 .addString(DB_NAME, dbName)
-                .addString(COMPRESS_EXTENSION, ".gz")
-                .addString(INCLUDE_SRC, "FIRST_8_COLUMNS")
+                .addString(STORAGE_COMPRESS_EXTENSION, ".gz")
+                .addString(STORAGE_INCLUDE_SRC, "FIRST_8_COLUMNS")
                 .addString(STUDY_TYPE, "COLLECTION")
                 .addString(STUDY_NAME, "studyName")
                 .addString(STUDY_ID, "1")
                 .addString(FILE_ID, "1")
                 .addString(OPENCGA_APP_HOME, opencgaHome)
                 .addString(JobParametersListener.STUDY_AGGREGATED, VariantSource.Aggregation.BASIC.toString())
-                .addString(INCLUDE_STATS, "false")
+                .addString(STATS_INCLUDE, "false")
                 .addString(SKIP_LOAD, "true")
                 .toJobParameters();
 
@@ -116,7 +116,7 @@ public class VariantAggregatedConfigurationTest {
 
         ////////// check transformed file
         String outputFilename = getTransformedOutputPath(Paths.get(FILE_AGGREGATED).getFileName(),
-                parameters.getString(COMPRESS_EXTENSION), parameters.getString(OUTPUT_DIR));
+                parameters.getString(STORAGE_COMPRESS_EXTENSION), parameters.getString(STORAGE_OUTPUT_DIR));
         logger.info("reading transformed output from: " + outputFilename);
 
         long lines = getLines(new GZIPInputStream(new FileInputStream(outputFilename)));
@@ -159,17 +159,17 @@ public class VariantAggregatedConfigurationTest {
 
         JobParameters parameters = new JobParametersBuilder()
                 .addString(INPUT, input)
-                .addString(OUTPUT_DIR, "/tmp")
+                .addString(STORAGE_OUTPUT_DIR, "/tmp")
                 .addString(DB_NAME, dbName)
-                .addString(COMPRESS_EXTENSION, ".gz")
-                .addString(COMPRESS_GENOTYPES, "true")
-                .addString(INCLUDE_SRC, "FIRST_8_COLUMNS")
+                .addString(STORAGE_COMPRESS_EXTENSION, ".gz")
+                .addString(STORAGE_COMPRESS_GENOTYPES, "true")
+                .addString(STORAGE_INCLUDE_SRC, "FIRST_8_COLUMNS")
                 .addString(STUDY_TYPE, "COLLECTION")
                 .addString(STUDY_NAME, "studyName")
                 .addString(STUDY_ID, "1")
                 .addString(FILE_ID, "1")
                 .addString(STUDY_AGGREGATED, VariantSource.Aggregation.BASIC.toString())
-                .addString(INCLUDE_STATS, "false")
+                .addString(STATS_INCLUDE, "false")
                 .addString(OPENCGA_APP_HOME, opencgaHome)
                 .toJobParameters();
 
@@ -184,7 +184,7 @@ public class VariantAggregatedConfigurationTest {
         VariantDBIterator iterator = variantDBAdaptor.iterator(new QueryOptions());
 
         String outputFilename = getTransformedOutputPath(Paths.get(FILE_AGGREGATED).getFileName(),
-                parameters.getString(COMPRESS_EXTENSION), parameters.getString(OUTPUT_DIR));
+                parameters.getString(STORAGE_COMPRESS_EXTENSION), parameters.getString(STORAGE_OUTPUT_DIR));
         long lines = getLines(new GZIPInputStream(new FileInputStream(outputFilename)));
 
         assertEquals(countRows(iterator), lines);
@@ -237,18 +237,18 @@ public class VariantAggregatedConfigurationTest {
 
         JobParameters parameters = new JobParametersBuilder()
                 .addString(INPUT, input)
-                .addString(OUTPUT_DIR, "/tmp")
+                .addString(STORAGE_OUTPUT_DIR, "/tmp")
                 .addString(DB_NAME, dbName)
-                .addString(COMPRESS_EXTENSION, ".gz")
-                .addString(COMPRESS_GENOTYPES, "true")
-                .addString(INCLUDE_SRC, "FIRST_8_COLUMNS")
+                .addString(STORAGE_COMPRESS_EXTENSION, ".gz")
+                .addString(STORAGE_COMPRESS_GENOTYPES, "true")
+                .addString(STORAGE_INCLUDE_SRC, "FIRST_8_COLUMNS")
                 .addString(STUDY_AGGREGATED, "NONE")
                 .addString(STUDY_TYPE, "COLLECTION")
                 .addString(STUDY_NAME, "studyName")
                 .addString(STUDY_ID, "1")
                 .addString(FILE_ID, "1")
                 .addString(STUDY_AGGREGATED, VariantSource.Aggregation.BASIC.toString())
-                .addString(INCLUDE_STATS, "true")
+                .addString(STATS_INCLUDE, "true")
                 .addString(OPENCGA_APP_HOME, opencgaHome)
                 .toJobParameters();
 
@@ -263,7 +263,7 @@ public class VariantAggregatedConfigurationTest {
         VariantDBIterator iterator = variantDBAdaptor.iterator(new QueryOptions());
 
         String outputFilename = getTransformedOutputPath(Paths.get(FILE_AGGREGATED).getFileName(),
-                parameters.getString(COMPRESS_EXTENSION), parameters.getString(OUTPUT_DIR));
+                parameters.getString(STORAGE_COMPRESS_EXTENSION), parameters.getString(STORAGE_OUTPUT_DIR));
         long lines = getLines(new GZIPInputStream(new FileInputStream(outputFilename)));
 
         assertEquals(countRows(iterator), lines);

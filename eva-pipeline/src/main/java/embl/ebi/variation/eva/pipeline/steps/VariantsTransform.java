@@ -51,11 +51,11 @@ public class VariantsTransform implements Tasklet {
         JobParameters parameters = chunkContext.getStepContext().getStepExecution().getJobParameters();
         ObjectMap variantOptions = listener.getVariantOptions();
 
-        URI outdirUri = createUri(parameters.getString(OUTPUT_DIR));
+        URI outdirUri = createUri(parameters.getString(STORAGE_OUTPUT_DIR));
         URI nextFileUri = createUri(parameters.getString(INPUT));
         URI pedigreeUri = parameters.getString(PEDIGREE) != null ? createUri(parameters.getString(PEDIGREE)) : null;
 
-        logger.info("transform file " + parameters.getString(INPUT) + " to " + parameters.getString(OUTPUT_DIR));
+        logger.info("transform file " + parameters.getString(INPUT) + " to " + parameters.getString(STORAGE_OUTPUT_DIR));
 
         logger.info("Extract variants '{}'", nextFileUri);
         VariantStorageManager variantStorageManager = StorageManagerFactory.getVariantStorageManager();

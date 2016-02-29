@@ -15,37 +15,36 @@
  */
 package embl.ebi.variation.eva.pipeline.listeners;
 
-import org.opencb.biodata.models.variant.VariantSource;
-import org.opencb.biodata.models.variant.VariantStudy;
 import org.opencb.datastore.core.ObjectMap;
-import org.opencb.opencga.lib.common.Config;
-import org.opencb.opencga.storage.core.variant.VariantStorageManager;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.batch.core.JobExecution;
 import org.springframework.batch.core.JobExecutionListener;
-import org.springframework.batch.core.JobParameters;
-import org.springframework.stereotype.Component;
 
 
 public abstract class JobParametersListener implements JobExecutionListener {
      
     private static final Logger logger = LoggerFactory.getLogger(JobParametersListener.class);
 
-    public static final String DB_NAME = "db.name";
-    public static final String COMPRESS_GENOTYPES = "compress.genotypes";
     public static final String INPUT = "input";
-    public static final String PEDIGREE = "pedigree";
-    public static final String OUTPUT_DIR = "output.dir";
+    public static final String DB_NAME = "db.name";
+    public static final String STORAGE_COMPRESS_GENOTYPES = "storage.compress.genotypes";
+    public static final String STORAGE_COMPRESS_EXTENSION = "storage.compress.extension";
+    public static final String STORAGE_INCLUDE_SRC = "storage.include.src";
+    public static final String STORAGE_OUTPUT_DIR = "storage.output.dir";
+    public static final String PEDIGREE = "pedigree";   // TODO remove ?
+    public static final String STATS_OUTPUT_DIR = "stats.output.dir";   // TODO use this in tests and stats steps
     public static final String FILE_ID = "file.id";
     public static final String STUDY_ID = "study.id";
     public static final String STUDY_NAME = "study.name";
     public static final String STUDY_TYPE = "study.type";
     public static final String STUDY_AGGREGATED = "study.aggregated";
-    public static final String INCLUDE_SRC = "include.src";
-    public static final String INCLUDE_STATS = "include.stats";
-    public static final String COMPRESS_EXTENSION = "compress.extension";
+    public static final String STUDY_AGGREGATED_MAPPING_FILE = "study.aggregated.mapping.file";
+    public static final String STATS_INCLUDE = "stats.include";
+    public static final String STATS_OVERWRITE = "stats.overwrite"; // TODO when merged feature/overwrite-stats don't use overwriteStats, use this one
+    public static final String STATS_COHORTS = "stats.cohorts";
     public static final String OPENCGA_APP_HOME = "opencga.app.home";
+    // TODO when merging feature/annotation, don't forget to add "annot.overwrite" that imitates to opencga's overwriteAnnotations
 
     protected final ObjectMap variantOptions;
     

@@ -68,18 +68,18 @@ public class AggregatedJobParametersListener extends JobParametersListener {
         variantOptions.put(VariantStorageManager.CALCULATE_STATS, false);   // this is tested by hand
 //                variantOptions.put(VariantStorageManager.OVERWRITE_STATS, config.overwriteStats);
         variantOptions.put(VariantStorageManager.INCLUDE_STATS, Boolean.parseBoolean(
-                parameters.getString(VariantStorageManager.INCLUDE_STATS, defaultIncludeStats)));
+                parameters.getString(STATS_INCLUDE, defaultIncludeStats)));
         
 //                variantOptions.put(VariantStorageManager.INCLUDE_GENOTYPES.key(), false);   // TODO rename samples to genotypes
         variantOptions.put(VariantStorageManager.INCLUDE_SAMPLES, false);   // TODO rename samples to genotypes
-        variantOptions.put(VariantStorageManager.INCLUDE_SRC, VariantStorageManager.IncludeSrc.parse(parameters.getString(INCLUDE_SRC)));
+        variantOptions.put(VariantStorageManager.INCLUDE_SRC, VariantStorageManager.IncludeSrc.parse(parameters.getString(STORAGE_INCLUDE_SRC)));
         variantOptions.put(VariantStorageManager.COMPRESS_GENOTYPES, false);
         
 //                variantOptions.put(VariantStorageManager.AGGREGATED_TYPE, VariantSource.Aggregation.NONE);
         variantOptions.put(VariantStorageManager.DB_NAME, parameters.getString(DB_NAME));
         variantOptions.put(VariantStorageManager.ANNOTATE, false);
 //                variantOptions.put(MongoDBVariantStorageManager.LOAD_THREADS, config.loadThreads);
-        variantOptions.put("compressExtension", parameters.getString(COMPRESS_EXTENSION));
+        variantOptions.put("compressExtension", parameters.getString(STORAGE_COMPRESS_EXTENSION));
 
         logger.debug("Using as variantOptions: {}", variantOptions.entrySet().toString());
         logger.debug("Using as input: {}", parameters.getString(INPUT));
