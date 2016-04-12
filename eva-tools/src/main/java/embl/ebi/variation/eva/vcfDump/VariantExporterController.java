@@ -39,18 +39,15 @@ import java.util.List;
 public class VariantExporterController {
 
     private final CellBaseClient cellBaseClient;
-    private final Iterator<Variant> iterator;
     private final String outputDir;
     private final VariantSourceDBAdaptor variantSourceDBAdaptor;
-    private final QueryOptions query;
+    private final VariantDBAdaptor variantDBAdaptor;
 
     public VariantExporterController(String species, String dbName, List<String> studies, List<String> files, String outputDir)
             throws IllegalAccessException, ClassNotFoundException, InstantiationException, StorageManagerException, URISyntaxException {
         this.outputDir = outputDir;
         cellBaseClient = getCellBaseClient(species);
-        VariantDBAdaptor variantDBAdaptor = getVariantDBAdaptor(dbName);
-        query = getQuery(studies, files);
-        iterator = variantDBAdaptor.iterator(query);
+        variantDBAdaptor = getVariantDBAdaptor(dbName);
         variantSourceDBAdaptor = variantDBAdaptor.getVariantSourceDBAdaptor();
     }
 
@@ -66,15 +63,8 @@ public class VariantExporterController {
         return variantStorageManager.getDBAdaptor(dbName, null);
     }
 
-    public QueryOptions getQuery(List<String> studies, List<String> files) {
-        QueryOptions query = new QueryOptions();
-        query.put(VariantDBAdaptor.FILES, files);
-        query.put(VariantDBAdaptor.STUDIES, studies);
-        return query;
-    }
-
-    public List<String> run() throws URISyntaxException, IOException {
-        return new VariantExporter(cellBaseClient).VcfHtsExport(iterator, outputDir, variantSourceDBAdaptor, query);
+    public List<String> run(List<String> studies, List<String> files) throws URISyntaxException, IOException {
+        return new VariantExporter(cellBaseClient, variantDBAdaptor, files, studies).VcfHtsExport(outputDir, variantSourceDBAdaptor);
     }
 
 }

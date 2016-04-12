@@ -66,6 +66,7 @@ public class VariantExporterTest {
 
         QueryOptions query = new QueryOptions();
 //        List<String> files = Arrays.asList("5");
+        // TODO: some of those lines could be removed
         List<String> files = Arrays.asList("5", "6");
         List<String> studies = Collections.singletonList("7");
         query.put(VariantDBAdaptor.FILES, files);
@@ -74,17 +75,16 @@ public class VariantExporterTest {
 
         VariantStorageManager variantStorageManager = StorageManagerFactory.getVariantStorageManager();
         VariantDBAdaptor variantDBAdaptor = variantStorageManager.getDBAdaptor(DB_NAME, null);
-        VariantDBIterator iterator = variantDBAdaptor.iterator(query);
         VariantSourceDBAdaptor variantSourceDBAdaptor = variantDBAdaptor.getVariantSourceDBAdaptor();
 
-        VariantExporter variantExporter = new VariantExporter(cellBaseClient);
-        List<String> outputFiles = variantExporter.VcfHtsExport(iterator, outputDir, variantSourceDBAdaptor, query);
+        VariantExporter variantExporter = new VariantExporter(cellBaseClient, variantDBAdaptor, files, studies);
+        List<String> outputFiles = variantExporter.VcfHtsExport(outputDir, variantSourceDBAdaptor);
 
         ////// checks 
         assertEquals(studies.size(), outputFiles.size());
         assertEquals(0, variantExporter.getFailedVariants());   // test file should not have failed variants
 
-        iterator = variantDBAdaptor.iterator(query);
+        VariantDBIterator iterator = variantDBAdaptor.iterator(query);
         assertEqualLinesFilesAndDB(outputFiles, iterator);
 
         for (String outputFile : outputFiles) {
@@ -98,6 +98,7 @@ public class VariantExporterTest {
 
         QueryOptions query = new QueryOptions();
 //        List<String> files = Arrays.asList("5");
+        // TODO: some of those lines could be removed
         List<String> files = Arrays.asList("5", "6");
         List<String> studies = Arrays.asList("7", "8");
         query.put(VariantDBAdaptor.FILES, files);
@@ -107,11 +108,10 @@ public class VariantExporterTest {
 
         VariantStorageManager variantStorageManager = StorageManagerFactory.getVariantStorageManager();
         VariantDBAdaptor variantDBAdaptor = variantStorageManager.getDBAdaptor(DB_NAME, null);
-        VariantDBIterator iterator = variantDBAdaptor.iterator(query);
         VariantSourceDBAdaptor variantSourceDBAdaptor = variantDBAdaptor.getVariantSourceDBAdaptor();
 
-        VariantExporter variantExporter = new VariantExporter(cellBaseClient);
-        List<String> outputFiles = variantExporter.VcfHtsExport(iterator, outputDir, variantSourceDBAdaptor, query);
+        VariantExporter variantExporter = new VariantExporter(cellBaseClient, variantDBAdaptor, files, studies);
+        List<String> outputFiles = variantExporter.VcfHtsExport(outputDir, variantSourceDBAdaptor);
 
         ////////// checks
 
@@ -120,7 +120,7 @@ public class VariantExporterTest {
 
         // for study 7
         query.put(VariantDBAdaptor.STUDIES, Collections.singletonList("7"));
-        iterator = variantDBAdaptor.iterator(query);
+        VariantDBIterator iterator = variantDBAdaptor.iterator(query);
         assertEquals(countRows(iterator), countLines(outputFiles.get(0)));
 
         // for study 8
@@ -140,6 +140,7 @@ public class VariantExporterTest {
 
         QueryOptions query = new QueryOptions();
 //        List<String> files = Arrays.asList("5");
+        // TODO: some of those lines could be removed
         List<String> files = Arrays.asList("5");
         List<String> studies = Arrays.asList("7");
         String outputDir = "/tmp/";
@@ -153,18 +154,17 @@ public class VariantExporterTest {
 
         VariantStorageManager variantStorageManager = StorageManagerFactory.getVariantStorageManager();
         VariantDBAdaptor variantDBAdaptor = variantStorageManager.getDBAdaptor(DB_NAME, null);
-        VariantDBIterator iterator = variantDBAdaptor.iterator(query);
         VariantSourceDBAdaptor variantSourceDBAdaptor = variantDBAdaptor.getVariantSourceDBAdaptor();
 
-        VariantExporter variantExporter = new VariantExporter(cellBaseClient);
-        List<String> outputFiles = variantExporter.VcfHtsExport(iterator, outputDir, variantSourceDBAdaptor, query);
+        VariantExporter variantExporter = new VariantExporter(cellBaseClient, variantDBAdaptor, files, studies);
+        List<String> outputFiles = variantExporter.VcfHtsExport(outputDir, variantSourceDBAdaptor);
 
         ////////// checks
 
         assertEquals(studies.size(), outputFiles.size());
         assertEquals(0, variantExporter.getFailedVariants());   // test file should not have failed variants
 
-        iterator = variantDBAdaptor.iterator(query);
+        VariantDBIterator iterator = variantDBAdaptor.iterator(query);
         assertEqualLinesFilesAndDB(outputFiles, iterator);
 
         for (String outputFile : outputFiles) {
@@ -177,6 +177,7 @@ public class VariantExporterTest {
     public void testMissingStudy() throws Exception {
 
         QueryOptions query = new QueryOptions();
+        // TODO: some of those lines could be removed
         List<String> files = Arrays.asList("5");
         List<String> studies = Arrays.asList("7", "9"); // study 9 doesn't exist
         query.put(VariantDBAdaptor.FILES, files);
@@ -188,10 +189,10 @@ public class VariantExporterTest {
         VariantDBIterator iterator = variantDBAdaptor.iterator(query);
         VariantSourceDBAdaptor variantSourceDBAdaptor = variantDBAdaptor.getVariantSourceDBAdaptor();
 
-        VariantExporter variantExporter = new VariantExporter(cellBaseClient);
+        VariantExporter variantExporter = new VariantExporter(cellBaseClient, variantDBAdaptor, files, studies);
 
         thrown.expect(IllegalArgumentException.class);  // comment this line to see the actual exception, making the test fail
-        variantExporter.VcfHtsExport(iterator, outputDir, variantSourceDBAdaptor, query);
+        variantExporter.VcfHtsExport(outputDir, variantSourceDBAdaptor);
     }
 
     @Test
@@ -216,7 +217,7 @@ public class VariantExporterTest {
         variants = factory.create(variantSource, multiallelicLine);
         assertEquals(2, variants.size());
         removeSrc(variants);    // <---- this is the key point of the test
-
+        
         VariantExporter variantExporter = new VariantExporter(null);
         variantContext = variantExporter.convertBiodataVariantToVariantContext(variants.get(0), sources);
 

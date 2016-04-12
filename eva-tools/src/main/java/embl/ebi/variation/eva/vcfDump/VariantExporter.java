@@ -34,6 +34,7 @@ import org.opencb.datastore.core.QueryOptions;
 import org.opencb.datastore.core.QueryResponse;
 import org.opencb.datastore.core.QueryResult;
 import org.opencb.opencga.storage.core.variant.adaptors.VariantDBAdaptor;
+import org.opencb.opencga.storage.core.variant.adaptors.VariantDBIterator;
 import org.opencb.opencga.storage.core.variant.adaptors.VariantSourceDBAdaptor;
 import org.opencb.opencga.storage.mongodb.variant.DBObjectToVariantSourceConverter;
 import org.slf4j.Logger;
@@ -55,11 +56,16 @@ public class VariantExporter {
     private static final Logger logger = LoggerFactory.getLogger(VariantExporter.class);
 
     private CellBaseClient cellbaseClient;
+    private VariantDBAdaptor variantDBAdaptor;
+    private final List<String> files;
+    private final List<String> studies;
     /**
      * Read only. Keeps track of the total failed variants across several dumps. To accumulate, use the same instance of
      * VariantExporter to dump several VCFs. If you just want to count on one dump, use a `new VariantExporter` each time.
      */
     private int failedVariants = 0;
+    private int writtenVariants;
+    private int failedVariants1;
 
     /**
      * if the variants will have empty alleles (such as normalized deletions: "A" to "") CellBase is mandatory to
@@ -70,25 +76,29 @@ public class VariantExporter {
      * If there won't be empty alleles, CellBase is not needed, and the parameter may be null.
      *
      * @param cellbaseClient for empty alleles. nullable.
+     * @param files
+     * @param studies
      */
-    public VariantExporter(CellBaseClient cellbaseClient) {
+    public VariantExporter(CellBaseClient cellbaseClient, VariantDBAdaptor variantDBAdaptor, List<String> files, List<String> studies) {
         this.cellbaseClient = cellbaseClient;
+        this.variantDBAdaptor = variantDBAdaptor;
+        this.files = files;
+        this.studies = studies;
     }
 
     /**
      * Main method of this class. It generates one VCF file per requested study,
      * writing both the header meta-data and the variants in the body.
      *
-     * @param iterator where to get the variants from
+
      * @param outputDir directory to write the output vcf(s) to
      * @param sourceDBAdaptor to retrieve all the VariantSources in any VariantSourceEntry
-     * @param options not implemented yet, use only for studyId and fileId
      * @return list of files written, one per study.
      */
-    public List<String> VcfHtsExport(Iterator<Variant> iterator, String outputDir,
-                                     VariantSourceDBAdaptor sourceDBAdaptor, QueryOptions options) throws IOException {
+    public List<String> VcfHtsExport(String outputDir, VariantSourceDBAdaptor sourceDBAdaptor) throws IOException {
 
         // 3 steps to get the headers of all the studyIds: ask the sourceAdaptor for VariantSources, check we got everything, build the headers.
+        QueryOptions options = getQuery();
         List<String> studyIds = options.getAsStringList(VariantDBAdaptor.STUDIES);
 
         // 1) retrieve the sources
@@ -107,6 +117,9 @@ public class VariantExporter {
 
         // 3) check and get the headers, one for each source
         Map<String, VCFHeader> headers = getVcfHeaders(sources);
+
+        // TODO: use sequenceDictionary?
+        List<String> chromosomes = getChromosomes(headers);
 
         // from here we grant that `headers` have all the headers requested in `studyIds`
 
@@ -137,10 +150,31 @@ public class VariantExporter {
         logger.info("Exporting to files: [" + StringUtils.join(files, " ") + "]");
 
         // actual loop
-        int failedVariants = 0;
-        int writtenVariants = 0;
-        while (iterator.hasNext()) {
-            Variant variant = iterator.next();
+        failedVariants1 = 0;
+        writtenVariants = 0;
+        for (String chromosome : chromosomes) {
+            getVariantsForChromosome(chromosome, sources, writers);
+        }
+
+
+        logger.info("total variants written: " + writtenVariants);
+        if (failedVariants1 > 0) {
+            logger.warn(failedVariants1 + " variants were not written due to errors");
+        }
+        this.failedVariants += failedVariants1;
+
+        for (VariantContextWriter variantContextWriter : writers.values()) {
+            variantContextWriter.close();
+        }
+
+        return files;
+    }
+
+    private void getVariantsForChromosome(String chromosome, Map<String, VariantSource> sources, Map<String, VariantContextWriter> writers) {
+        QueryOptions query = getQuery(chromosome);
+        VariantDBIterator chromosomeIterator = variantDBAdaptor.iterator(query);
+        while (chromosomeIterator.hasNext()) {
+            Variant variant = chromosomeIterator.next();
             try {
                 Map<String, VariantContext> variantContexts = convertBiodataVariantToVariantContext(variant, sources);
                 for (Map.Entry<String, VariantContext> variantContextEntry : variantContexts.entrySet()) {
@@ -152,25 +186,28 @@ public class VariantExporter {
                 logger.info(String.format("Variant dump failed: \"%s:%d:%s>%s\"", variant.getChromosome(),
                         variant.getStart(), variant.getReference(), variant.getAlternate()),
                         e);
-                failedVariants++;
+                failedVariants1++;
             }
             writtenVariants++;
             if (writtenVariants % 1000000 == 0) {
                 logger.info("written variants: " + writtenVariants);
             }
         }
+    }
 
-        logger.info("total variants written: " + writtenVariants);
-        if (failedVariants > 0) {
-            logger.warn(failedVariants + " variants were not written due to errors");
+    private QueryOptions getQuery() {
+        return getQuery(null);
+    }
+
+    private QueryOptions getQuery(String chromosome) {
+        QueryOptions query = new QueryOptions();
+        query.put(VariantDBAdaptor.FILES, files);
+        query.put(VariantDBAdaptor.STUDIES, studies);
+        if (chromosome != null) {
+            query.put(VariantDBAdaptor.CHROMOSOME, chromosome);
         }
-        this.failedVariants += failedVariants;
-
-        for (VariantContextWriter variantContextWriter : writers.values()) {
-            variantContextWriter.close();
-        }
-
-        return files;
+        // TODO: add sort to query
+        return query;
     }
 
     /**
@@ -226,6 +263,11 @@ public class VariantExporter {
 
         // */
 
+    }
+
+    private List<String> getChromosomes(Map<String, VCFHeader> headers) {
+        //cellbaseClient.getAll("chromosomes");
+        return Arrays.asList("Y", "MT");
     }
 
     public int getFailedVariants() {
