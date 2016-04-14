@@ -18,6 +18,8 @@ package embl.ebi.variation.eva.vcfDump;
 import com.beust.jcommander.JCommander;
 import com.beust.jcommander.ParameterException;
 import java.util.List;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 import javax.ws.rs.core.MultivaluedHashMap;
 import org.opencb.opencga.lib.common.Config;
 import org.springframework.boot.CommandLineRunner;
@@ -37,6 +39,7 @@ import org.springframework.boot.autoconfigure.SpringBootApplication;
 @SpringBootApplication
 public class VariantExportBootApplication implements CommandLineRunner {
 
+    final Logger logger = Logger.getLogger(getClass().getName());
     VariantExportCommand command;
     JCommander commander;
 
@@ -58,7 +61,7 @@ public class VariantExportBootApplication implements CommandLineRunner {
         try {
             validateArguments(args);
         } catch (ParameterException e) {
-            System.err.println("Invalid argument: " + e.getMessage());
+            logger.log(Level.SEVERE, "Invalid argument: {0}", e.getMessage());
             help();
             System.exit(1);
         }
@@ -75,7 +78,7 @@ public class VariantExportBootApplication implements CommandLineRunner {
                             command.outdir, 
                             new MultivaluedHashMap<String, String>()).run();
         } catch (Exception e) {
-            System.err.println("Unsuccessful VCF export: " + e.getMessage());
+            logger.log(Level.SEVERE, "Unsuccessful VCF export: {0}", e.getMessage());
             System.exit(1);
         }
     }
