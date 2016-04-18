@@ -15,7 +15,9 @@
  */
 package embl.ebi.variation.eva.vcfDump;
 
+import com.mongodb.BasicDBObject;
 import htsjdk.samtools.SAMSequenceDictionary;
+import htsjdk.samtools.SAMSequenceRecord;
 import htsjdk.tribble.FeatureCodecHeader;
 import htsjdk.tribble.readers.LineIterator;
 import htsjdk.variant.variantcontext.*;
@@ -39,12 +41,17 @@ import org.opencb.opencga.storage.core.variant.adaptors.VariantSourceDBAdaptor;
 import org.opencb.opencga.storage.mongodb.variant.DBObjectToVariantSourceConverter;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.core.ParameterizedTypeReference;
+import org.springframework.http.HttpMethod;
+import org.springframework.http.ResponseEntity;
+import org.springframework.web.client.RestTemplate;
 
 import java.io.ByteArrayInputStream;
 import java.io.File;
 import java.io.IOException;
 import java.nio.file.Paths;
 import java.util.*;
+import java.util.stream.Collectors;
 
 /**
  * Created by jmmut on 2015-10-28.
@@ -54,11 +61,10 @@ import java.util.*;
 public class VariantExporter {
 
     private static final Logger logger = LoggerFactory.getLogger(VariantExporter.class);
+    private final QueryOptions options;
 
     private CellBaseClient cellbaseClient;
     private VariantDBAdaptor variantDBAdaptor;
-    private final List<String> files;
-    private final List<String> studies;
     /**
      * Read only. Keeps track of the total failed variants across several dumps. To accumulate, use the same instance of
      * VariantExporter to dump several VCFs. If you just want to count on one dump, use a `new VariantExporter` each time.
@@ -79,11 +85,10 @@ public class VariantExporter {
      * @param files
      * @param studies
      */
-    public VariantExporter(CellBaseClient cellbaseClient, VariantDBAdaptor variantDBAdaptor, List<String> files, List<String> studies) {
+    public VariantExporter(CellBaseClient cellbaseClient, VariantDBAdaptor variantDBAdaptor, QueryOptions query) {
         this.cellbaseClient = cellbaseClient;
         this.variantDBAdaptor = variantDBAdaptor;
-        this.files = files;
-        this.studies = studies;
+        this.options = query;
     }
 
     /**
@@ -98,7 +103,6 @@ public class VariantExporter {
     public List<String> VcfHtsExport(String outputDir, VariantSourceDBAdaptor sourceDBAdaptor) throws IOException {
 
         // 3 steps to get the headers of all the studyIds: ask the sourceAdaptor for VariantSources, check we got everything, build the headers.
-        QueryOptions options = getQuery();
         List<String> studyIds = options.getAsStringList(VariantDBAdaptor.STUDIES);
 
         // 1) retrieve the sources
@@ -117,9 +121,6 @@ public class VariantExporter {
 
         // 3) check and get the headers, one for each source
         Map<String, VCFHeader> headers = getVcfHeaders(sources);
-
-        // TODO: use sequenceDictionary?
-        List<String> chromosomes = getChromosomes(headers);
 
         // from here we grant that `headers` have all the headers requested in `studyIds`
 
@@ -152,8 +153,14 @@ public class VariantExporter {
         // actual loop
         failedVariants1 = 0;
         writtenVariants = 0;
-        for (String chromosome : chromosomes) {
-            getVariantsForChromosome(chromosome, sources, writers);
+
+        Set<String> chromosomes = getChromosomes(headers, studyIds, options);
+        if (chromosomes.isEmpty()) {
+            dumpVariants(sources, writers, options);
+        } else {
+            for (String chromosome : chromosomes) {
+                dumpVariantsForChromosome(chromosome, sources, writers);
+            }
         }
 
 
@@ -170,9 +177,14 @@ public class VariantExporter {
         return files;
     }
 
-    private void getVariantsForChromosome(String chromosome, Map<String, VariantSource> sources, Map<String, VariantContextWriter> writers) {
-        QueryOptions query = getQuery(chromosome);
+    private void dumpVariantsForChromosome(String chromosome, Map<String, VariantSource> sources, Map<String, VariantContextWriter> writers) {
+        QueryOptions chromosomeQuery = addChromosomeAndSortToQuery(chromosome);
+        dumpVariants(sources, writers, chromosomeQuery);
+    }
+
+    private void dumpVariants(Map<String, VariantSource> sources, Map<String, VariantContextWriter> writers, QueryOptions query) {
         VariantDBIterator chromosomeIterator = variantDBAdaptor.iterator(query);
+        // TODO: use projection with file id to reduce network traffic??
         while (chromosomeIterator.hasNext()) {
             Variant variant = chromosomeIterator.next();
             try {
@@ -195,19 +207,15 @@ public class VariantExporter {
         }
     }
 
-    private QueryOptions getQuery() {
-        return getQuery(null);
-    }
+    private QueryOptions addChromosomeAndSortToQuery(String chromosome) {
+        QueryOptions chromosomeQuery = new QueryOptions(options);
+        chromosomeQuery.put(VariantDBAdaptor.CHROMOSOME, chromosome);
+        BasicDBObject sortDBObject = new BasicDBObject();
+        sortDBObject.put("start", 1);
+        sortDBObject.put("end", -1);
 
-    private QueryOptions getQuery(String chromosome) {
-        QueryOptions query = new QueryOptions();
-        query.put(VariantDBAdaptor.FILES, files);
-        query.put(VariantDBAdaptor.STUDIES, studies);
-        if (chromosome != null) {
-            query.put(VariantDBAdaptor.CHROMOSOME, chromosome);
-        }
-        // TODO: add sort to query
-        return query;
+        chromosomeQuery.put("sort", sortDBObject);
+        return chromosomeQuery;
     }
 
     /**
@@ -265,9 +273,54 @@ public class VariantExporter {
 
     }
 
-    private List<String> getChromosomes(Map<String, VCFHeader> headers) {
-        //cellbaseClient.getAll("chromosomes");
-        return Arrays.asList("Y", "MT");
+    private Set<String> getChromosomes(Map<String, VCFHeader> headers, List<String> studyIds, QueryOptions options) {
+        Set<String> chromosomes;
+
+        List<String> regions = options.getAsStringList(VariantDBAdaptor.REGION);
+        if (regions.size() > 0) {
+            chromosomes = getChromosomesFromRegionFilter(regions);
+        } else {
+            chromosomes = getChromosomesFromCellbaseREST();
+            if (chromosomes == null || chromosomes.isEmpty()) {
+                chromosomes = getChromosomesFromVCFHeader(headers, studyIds);
+            }
+        }
+
+        return chromosomes;
+    }
+
+    private Set<String> getChromosomesFromRegionFilter(List<String> regions) {
+        return regions.stream().map(r -> r.split(":")[0]).collect(Collectors.toSet());
+    }
+
+    private Set<String> getChromosomesFromCellbaseREST() {
+        // call cellbase chromosomes WS
+        RestTemplate restTemplate = new RestTemplate();
+        ParameterizedTypeReference<QueryResponse<QueryResult<CellbaseChromosomesWSOutput>>> responseType =
+                new ParameterizedTypeReference<QueryResponse<QueryResult<CellbaseChromosomesWSOutput>>>() {};
+        // TODO: property file or command line option for cellbase rest URL?
+        ResponseEntity<QueryResponse<QueryResult<CellbaseChromosomesWSOutput>>> wsOutput =
+                restTemplate.exchange("http://bioinfo.hpc.cam.ac.uk/cellbase/webservices/rest/v3/hsapiens/genomic/chromosome/all",
+                        HttpMethod.GET, null, responseType);
+
+        // parse WS output and return all chromosome names
+        QueryResponse<QueryResult<CellbaseChromosomesWSOutput>> response = wsOutput.getBody();
+        QueryResult<CellbaseChromosomesWSOutput> result = response.getResponse().get(0);
+        CellbaseChromosomesWSOutput results = result.getResult().get(0);
+        return results.getAllChromosomeNames();
+
+    }
+
+    private Set<String> getChromosomesFromVCFHeader(Map<String, VCFHeader> headers, List<String> studyIds) {
+        Set<String> chromosomes = new HashSet<>();
+        // TODO: test with a saved study VCF header
+        // setup writers
+        for (String studyId : studyIds) {
+            SAMSequenceDictionary sequenceDictionary = headers.get(studyId).getSequenceDictionary();
+            chromosomes.addAll(sequenceDictionary.getSequences().stream().map(SAMSequenceRecord::getSequenceName).collect(Collectors.toSet()));
+        }
+
+        return chromosomes;
     }
 
     public int getFailedVariants() {

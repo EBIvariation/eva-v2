@@ -15,7 +15,6 @@
  */
 package embl.ebi.variation.eva.vcfDump;
 
-import org.opencb.biodata.models.variant.Variant;
 import org.opencb.cellbase.core.client.CellBaseClient;
 import org.opencb.datastore.core.QueryOptions;
 import org.opencb.opencga.lib.common.Config;
@@ -28,7 +27,6 @@ import org.opencb.opencga.storage.core.variant.adaptors.VariantSourceDBAdaptor;
 import java.io.IOException;
 import java.net.URI;
 import java.net.URISyntaxException;
-import java.util.Iterator;
 import java.util.List;
 
 /**
@@ -39,12 +37,16 @@ import java.util.List;
 public class VariantExporterController {
 
     private final CellBaseClient cellBaseClient;
+    private final List<String> studies;
+    private final List<String> files;
     private final String outputDir;
     private final VariantSourceDBAdaptor variantSourceDBAdaptor;
     private final VariantDBAdaptor variantDBAdaptor;
 
     public VariantExporterController(String species, String dbName, List<String> studies, List<String> files, String outputDir)
             throws IllegalAccessException, ClassNotFoundException, InstantiationException, StorageManagerException, URISyntaxException {
+        this.studies = studies;
+        this.files = files;
         this.outputDir = outputDir;
         cellBaseClient = getCellBaseClient(species);
         variantDBAdaptor = getVariantDBAdaptor(dbName);
@@ -63,8 +65,15 @@ public class VariantExporterController {
         return variantStorageManager.getDBAdaptor(dbName, null);
     }
 
-    public List<String> run(List<String> studies, List<String> files) throws URISyntaxException, IOException {
-        return new VariantExporter(cellBaseClient, variantDBAdaptor, files, studies).VcfHtsExport(outputDir, variantSourceDBAdaptor);
+    public QueryOptions getQuery() {
+        QueryOptions query = new QueryOptions();
+        query.put(VariantDBAdaptor.FILES, files);
+        query.put(VariantDBAdaptor.STUDIES, studies);
+        return query;
+    }
+
+    public List<String> run() throws URISyntaxException, IOException {
+        return new VariantExporter(cellBaseClient, variantDBAdaptor, getQuery()).VcfHtsExport(outputDir, variantSourceDBAdaptor);
     }
 
 }
