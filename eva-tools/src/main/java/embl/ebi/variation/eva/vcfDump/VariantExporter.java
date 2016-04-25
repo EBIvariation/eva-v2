@@ -159,7 +159,8 @@ public class VariantExporter {
             dumpVariants(sources, writers, options);
         } else {
             for (String chromosome : chromosomes) {
-                dumpVariantsForChromosome(chromosome, sources, writers);
+                //dumpVariantsForChromosome(chromosome, sources, writers);
+                dumpVariantsForChromosomeUsingRegions(chromosome, sources, writers);
             }
         }
 
@@ -177,16 +178,78 @@ public class VariantExporter {
         return files;
     }
 
+    private void dumpVariantsForChromosomeUsingRegions(String chromosome, Map<String, VariantSource> sources, Map<String, VariantContextWriter> writers) {
+        List<String> allRegionsInChromosome = getRegionsListForChromosome(chromosome);
+        for (String chunk : allRegionsInChromosome) {
+            Map<String, List<VariantContext>> variantsInChunk = dumpVariantsInRegion(chunk, sources);
+            writeChunkToOutputFiles(variantsInChunk, writers);}
+    }
+
+    private List<String> getRegionsListForChromosome(String chromosome) {
+        // TODO: implement
+        // TODO: get min start position chromosome, get max start position chromosome
+        // TODO: get all regions between both
+        // TODO: can a variant be in two regions? -> it seems that the chunk is just by start, then, no
+//        return Arrays.asList("21:35500000-35509999", "21:35510000-35519999");
+        return Arrays.asList("21:9701000-9701999");
+    }
+
+    private Map<String, List<VariantContext>> dumpVariantsInRegion(String region, Map<String, VariantSource> sources) {
+        Map<String, List<VariantContext>> dumpedVariants = new HashMap<>();
+
+        QueryOptions regionQuery = addRegionToQuery(region);
+        VariantDBIterator variantDBIterator = variantDBAdaptor.iterator(regionQuery);
+        while (variantDBIterator.hasNext()) {
+            Variant variant = variantDBIterator.next();
+            try {
+                Map<String, VariantContext> variantContexts = convertBiodataVariantToVariantContext(variant, sources);
+                for (Map.Entry<String, VariantContext> variantContext : variantContexts.entrySet()) {
+                    dumpedVariants.putIfAbsent(variantContext.getKey(), new ArrayList<>());
+                    dumpedVariants.get(variantContext.getKey()).add(variantContext.getValue());
+                }
+            } catch (IOException e) {
+                // TODO: treat exception
+                e.printStackTrace();
+            }
+        }
+
+        for (List<VariantContext> regionVariants : dumpedVariants.values()) {
+            Collections.sort(regionVariants, (v1, v2)-> v1.getStart() - v2.getStart());
+        }
+
+        return dumpedVariants;
+    }
+
+    private QueryOptions addRegionToQuery(String region) {
+        QueryOptions regionQuery = new QueryOptions(options);
+        regionQuery.put("region", region);
+        return regionQuery;
+    }
+
+    private void writeChunkToOutputFiles(Map<String, List<VariantContext>> variantsInChunk, Map<String, VariantContextWriter> writers) {
+        // TODO: rename variables
+        for (Map.Entry<String, List<VariantContext>> variantsInChunkEntry : variantsInChunk.entrySet()) {
+            if (writers.containsKey(variantsInChunkEntry.getKey())) {
+                VariantContextWriter writer = writers.get(variantsInChunkEntry.getKey());
+                for (VariantContext variantContext : variantsInChunkEntry.getValue()) {
+                    writer.add(variantContext);
+                }
+            }
+        }
+    }
+
+    // TODO: this method doesnt return a ordered vcf, remove
+    @Deprecated
     private void dumpVariantsForChromosome(String chromosome, Map<String, VariantSource> sources, Map<String, VariantContextWriter> writers) {
         QueryOptions chromosomeQuery = addChromosomeAndSortToQuery(chromosome);
         dumpVariants(sources, writers, chromosomeQuery);
     }
 
     private void dumpVariants(Map<String, VariantSource> sources, Map<String, VariantContextWriter> writers, QueryOptions query) {
-        VariantDBIterator chromosomeIterator = variantDBAdaptor.iterator(query);
+        VariantDBIterator variantDBIterator = variantDBAdaptor.iterator(query);
         // TODO: use projection with file id to reduce network traffic??
-        while (chromosomeIterator.hasNext()) {
-            Variant variant = chromosomeIterator.next();
+        while (variantDBIterator.hasNext()) {
+            Variant variant = variantDBIterator.next();
             try {
                 Map<String, VariantContext> variantContexts = convertBiodataVariantToVariantContext(variant, sources);
                 for (Map.Entry<String, VariantContext> variantContextEntry : variantContexts.entrySet()) {
@@ -201,16 +264,18 @@ public class VariantExporter {
                 failedVariants1++;
             }
             writtenVariants++;
-            if (writtenVariants % 1000000 == 0) {
+            if (writtenVariants % 100000 == 0) {
                 logger.info("written variants: " + writtenVariants);
             }
         }
     }
 
     private QueryOptions addChromosomeAndSortToQuery(String chromosome) {
+        // TODO: this sort doesnt guarantee the order in the vcf output, remove
         QueryOptions chromosomeQuery = new QueryOptions(options);
         chromosomeQuery.put(VariantDBAdaptor.CHROMOSOME, chromosome);
         BasicDBObject sortDBObject = new BasicDBObject();
+        sortDBObject.put("chr", 1);
         sortDBObject.put("start", 1);
         sortDBObject.put("end", -1);
 
@@ -285,7 +350,9 @@ public class VariantExporter {
                 chromosomes = getChromosomesFromVCFHeader(headers, studyIds);
             }
         }
-
+        // TODO: just for testing, delete
+        chromosomes = new HashSet<>();
+        chromosomes.add("21");
         return chromosomes;
     }
 
@@ -446,4 +513,5 @@ public class VariantExporter {
         }
         return variantContextMap;
     }
+
 }
