@@ -186,12 +186,50 @@ public class VariantExporter {
     }
 
     private List<String> getRegionsListForChromosome(String chromosome) {
-        // TODO: implement
-        // TODO: get min start position chromosome, get max start position chromosome
+        int minStart = getMinStart(chromosome);
+        int maxStart = getMaxStart(chromosome);
+        System.out.println("maxStart = " + maxStart);
+        System.out.println("minStart = " + minStart);
         // TODO: get all regions between both
         // TODO: can a variant be in two regions? -> it seems that the chunk is just by start, then, no
 //        return Arrays.asList("21:35500000-35509999", "21:35510000-35519999");
         return Arrays.asList("21:9701000-9701999");
+    }
+
+    private int getMinStart(String chromosome) {
+        QueryOptions minQuery = addChromosomeSortAndLimitToQuery(chromosome, true);
+        return getVariantStart(minQuery);
+    }
+
+    private int getMaxStart(String chromosome) {
+        QueryOptions maxQuery = addChromosomeSortAndLimitToQuery(chromosome, false);
+        return getVariantStart(maxQuery);
+    }
+
+    private QueryOptions addChromosomeSortAndLimitToQuery(String chromosome, boolean ascending) {
+        QueryOptions chromosomeSortedByStartQuery = new QueryOptions(options);
+        chromosomeSortedByStartQuery.put(VariantDBAdaptor.CHROMOSOME, chromosome);
+
+        BasicDBObject sortDBObject = new BasicDBObject();
+        int orderOperator = ascending ? 1 : -1;
+        sortDBObject.put("chr", orderOperator);
+        sortDBObject.put("start", orderOperator);
+        chromosomeSortedByStartQuery.put("sort", sortDBObject);
+
+        chromosomeSortedByStartQuery.put("limit", 1);
+
+        return chromosomeSortedByStartQuery;
+    }
+
+    private int getVariantStart(QueryOptions query) {
+        int start = -1;
+        VariantDBIterator variantDBIterator = variantDBAdaptor.iterator(query);
+        if (variantDBIterator.hasNext()) {
+            Variant variant = variantDBIterator.next();
+            start = variant.getStart();
+        }
+
+        return start;
     }
 
     private Map<String, List<VariantContext>> dumpVariantsInRegion(String region, Map<String, VariantSource> sources) {
