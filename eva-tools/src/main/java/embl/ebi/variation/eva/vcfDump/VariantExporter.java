@@ -61,6 +61,7 @@ import java.util.stream.Collectors;
 public class VariantExporter {
 
     private static final Logger logger = LoggerFactory.getLogger(VariantExporter.class);
+    private static final int WINDOW_SIZE = 20000;
     private final QueryOptions options;
 
     private CellBaseClient cellbaseClient;
@@ -72,6 +73,7 @@ public class VariantExporter {
     private int failedVariants = 0;
     private int writtenVariants;
     private int failedVariants1;
+    private long totalQuerying = 0;
 
     /**
      * if the variants will have empty alleles (such as normalized deletions: "A" to "") CellBase is mandatory to
@@ -163,6 +165,7 @@ public class VariantExporter {
                 dumpVariantsForChromosomeUsingRegions(chromosome, sources, writers);
             }
         }
+        logger.debug("Total time spent querying to database: {}", totalQuerying);
 
 
         logger.info("total variants written: " + writtenVariants);
@@ -178,22 +181,37 @@ public class VariantExporter {
         return files;
     }
 
-    private void dumpVariantsForChromosomeUsingRegions(String chromosome, Map<String, VariantSource> sources, Map<String, VariantContextWriter> writers) {
+    private void dumpVariantsForChromosomeUsingRegions(String chromosome, Map<String, VariantSource> sources, Map<String, VariantContextWriter> writers) throws IOException {
         List<String> allRegionsInChromosome = getRegionsListForChromosome(chromosome);
-        for (String chunk : allRegionsInChromosome) {
-            Map<String, List<VariantContext>> variantsInChunk = dumpVariantsInRegion(chunk, sources);
-            writeChunkToOutputFiles(variantsInChunk, writers);}
+        for (String region : allRegionsInChromosome) {
+            long start = System.currentTimeMillis();
+            Map<String, List<VariantContext>> variantsInRegion = dumpVariantsInRegion(region, sources);
+            long queryFinished = System.currentTimeMillis();
+
+            writeChunkToOutputFiles(variantsInRegion, writers);
+            long writeAndSortFinished = System.currentTimeMillis();
+
+            logger.debug("Time(ms.) getting region {} variants: {}", region, (queryFinished - start));
+            totalQuerying += (queryFinished - start);
+            logger.debug("Time(ms) sorting and writing region {}: {}", region, (writeAndSortFinished - queryFinished));
+            logger.debug("Total time processing region {}: {}", region, (writeAndSortFinished - start));
+        }
     }
 
     private List<String> getRegionsListForChromosome(String chromosome) {
         int minStart = getMinStart(chromosome);
         int maxStart = getMaxStart(chromosome);
-        System.out.println("maxStart = " + maxStart);
-        System.out.println("minStart = " + minStart);
-        // TODO: get all regions between both
-        // TODO: can a variant be in two regions? -> it seems that the chunk is just by start, then, no
-//        return Arrays.asList("21:35500000-35509999", "21:35510000-35519999");
-        return Arrays.asList("21:9701000-9701999");
+        logger.debug("Chromosome {} maxStart: {}", chromosome, maxStart);
+        logger.debug("Chromosome {} minStart: {}", chromosome, minStart);
+
+        List<String> regions = getRegions(chromosome, minStart, maxStart);
+        // TODO: this is for testing, remove
+        regions = regions.subList(0, 20);
+        logger.debug("Number of regions in chromosome{}: {}", chromosome, regions.size());
+        logger.debug("First region: {}", regions.get(0));
+        logger.debug("Last region: {}", regions.get(regions.size() -1 ));
+
+        return regions;
     }
 
     private int getMinStart(String chromosome) {
@@ -232,10 +250,23 @@ public class VariantExporter {
         return start;
     }
 
-    private Map<String, List<VariantContext>> dumpVariantsInRegion(String region, Map<String, VariantSource> sources) {
-        Map<String, List<VariantContext>> dumpedVariants = new HashMap<>();
+    private List<String> getRegions(String chromosome, int minStart, int maxStart) {
+        List<String> regions = new ArrayList<>();
+        int nextStart = minStart;
+        while (nextStart <= maxStart) {
+            StringBuilder sb = new StringBuilder(chromosome);
+            int end = nextStart + WINDOW_SIZE;
+            sb.append(':').append(nextStart).append('-').append(end - 1);
+            regions.add(sb.toString());
+            nextStart = end;
+        }
+        return regions;
+    }
 
+    private Map<String, List<VariantContext>> dumpVariantsInRegion(String region, Map<String, VariantSource> sources) throws IOException {
+        Map<String, List<VariantContext>> dumpedVariants = new HashMap<>();
         QueryOptions regionQuery = addRegionToQuery(region);
+        regionQuery = addProjectionToQuery(regionQuery);
         VariantDBIterator variantDBIterator = variantDBAdaptor.iterator(regionQuery);
         while (variantDBIterator.hasNext()) {
             Variant variant = variantDBIterator.next();
@@ -246,8 +277,8 @@ public class VariantExporter {
                     dumpedVariants.get(variantContext.getKey()).add(variantContext.getValue());
                 }
             } catch (IOException e) {
-                // TODO: treat exception
-                e.printStackTrace();
+                logger.error("Error dumping variants for region {}: {}", region, e.getMessage());
+                throw e;
             }
         }
 
@@ -258,20 +289,24 @@ public class VariantExporter {
         return dumpedVariants;
     }
 
+    private QueryOptions addProjectionToQuery(QueryOptions regionQuery) {
+        // TODO: do we need cohortStarts?
+        regionQuery.put("include", "reference,alternative,start,end,chromosome,sourceEntries.cohortStats,sourceEntries");
+        return regionQuery;
+    }
+
     private QueryOptions addRegionToQuery(String region) {
         QueryOptions regionQuery = new QueryOptions(options);
         regionQuery.put("region", region);
         return regionQuery;
     }
 
-    private void writeChunkToOutputFiles(Map<String, List<VariantContext>> variantsInChunk, Map<String, VariantContextWriter> writers) {
-        // TODO: rename variables
-        for (Map.Entry<String, List<VariantContext>> variantsInChunkEntry : variantsInChunk.entrySet()) {
-            if (writers.containsKey(variantsInChunkEntry.getKey())) {
-                VariantContextWriter writer = writers.get(variantsInChunkEntry.getKey());
-                for (VariantContext variantContext : variantsInChunkEntry.getValue()) {
-                    writer.add(variantContext);
-                }
+    private void writeChunkToOutputFiles(Map<String, List<VariantContext>> variantsPerStudyInChunk, Map<String, VariantContextWriter> writers) {
+        for (Map.Entry<String, List<VariantContext>> variantsPerStudy : variantsPerStudyInChunk.entrySet()) {
+            String study = variantsPerStudy.getKey();
+            if (writers.containsKey(study)) {
+                VariantContextWriter writer = writers.get(study);
+                variantsPerStudy.getValue().forEach(writer::add);
             }
         }
     }
@@ -403,7 +438,7 @@ public class VariantExporter {
         RestTemplate restTemplate = new RestTemplate();
         ParameterizedTypeReference<QueryResponse<QueryResult<CellbaseChromosomesWSOutput>>> responseType =
                 new ParameterizedTypeReference<QueryResponse<QueryResult<CellbaseChromosomesWSOutput>>>() {};
-        // TODO: property file or command line option for cellbase rest URL?
+        // TODO: property file or command line option for cellbase rest URL? OPENCGA?
         ResponseEntity<QueryResponse<QueryResult<CellbaseChromosomesWSOutput>>> wsOutput =
                 restTemplate.exchange("http://bioinfo.hpc.cam.ac.uk/cellbase/webservices/rest/v3/hsapiens/genomic/chromosome/all",
                         HttpMethod.GET, null, responseType);
@@ -486,25 +521,10 @@ public class VariantExporter {
                 }
 
                 if (emptyAlleles) {
-                    if (cellbaseClient != null) {
-                        List<Region> regions = Collections.singletonList(new Region(variant.getChromosome(), start - 1, start-1));
-
-                        QueryResponse<QueryResult<GenomeSequenceFeature>> sequence = cellbaseClient.getSequence(
-                                CellBaseClient.Category.genomic, CellBaseClient.SubCategory.region, regions, null);
-
-                        List<GenomeSequenceFeature> response = sequence.getResponse().get(0).getResult();
-                        if (response.size() == 1) {
-                            start--;
-                            allelesArray = new ArrayList<>();
-                            allelesArray.add(response.get(0).getSequence() + reference);
-                            allelesArray.add(response.get(0).getSequence() + alternate);
-                            end = start + allelesArray.get(0).length()-1;   // -1 because end is inclusive. [start, end] instead of [start, end)
-                        }
-                    } else {
-                        throw new IllegalArgumentException(String.format(
-                                "CellBase was not provided, needed to fill empty alleles at study %s, in variant %s:%d:%s>%s", studyId,
-                                variant.getChromosome(), variant.getStart(), variant.getReference(), variant.getAlternate()));
-                    }
+                    String contextNucleotide = getContextNucleotideFromCellbase(variant, start, studyId);
+                    allelesArray.set(0, contextNucleotide + reference);
+                    allelesArray.set(1, contextNucleotide + alternate);
+                    end = start + allelesArray.get(0).length()-1;   // -1 because end is inclusive. [start, end] instead of [start, end)
                 }
 
                 // add the genotypes
@@ -550,6 +570,26 @@ public class VariantExporter {
             variantContextMap.put(studyEntry.getKey(), make);
         }
         return variantContextMap;
+    }
+
+    private String getContextNucleotideFromCellbase(Variant variant, Integer start, String studyId) throws IOException {
+        if (cellbaseClient != null) {
+            String nucleotide = null;
+            List<Region> regions = Collections.singletonList(new Region(variant.getChromosome(), start - 1, start-1));
+
+            QueryResponse<QueryResult<GenomeSequenceFeature>> sequence = cellbaseClient.getSequence(
+                    CellBaseClient.Category.genomic, CellBaseClient.SubCategory.region, regions, null);
+
+            List<GenomeSequenceFeature> response = sequence.getResponse().get(0).getResult();
+            if (response.size() == 1) {
+                nucleotide = response.get(0).getSequence();
+            }
+            return nucleotide;
+        } else {
+            throw new IllegalArgumentException(String.format(
+                    "CellBase was not provided, needed to fill empty alleles at study %s, in variant %s:%d:%s>%s", studyId,
+                    variant.getChromosome(), variant.getStart(), variant.getReference(), variant.getAlternate()));
+        }
     }
 
 }

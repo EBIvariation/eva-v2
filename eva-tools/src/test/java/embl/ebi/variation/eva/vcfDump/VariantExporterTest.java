@@ -63,6 +63,34 @@ public class VariantExporterTest {
     public ExpectedException thrown = ExpectedException.none();
     private static CellBaseClient cellBaseClient;
 
+    /**
+     * Clears and populates the Mongo collection used during the tests.
+     * @throws java.io.IOException
+     * @throws java.lang.InterruptedException
+     */
+    @BeforeClass
+    public static void setUpClass() throws IOException, InterruptedException, URISyntaxException {
+        cleanDBs();
+        fillDB();
+
+        Config.setOpenCGAHome(System.getenv("OPENCGA_HOME") != null ? System.getenv("OPENCGA_HOME") : "/opt/opencga");
+        String url = (String) Config.getStorageProperties().get("CELLBASE.REST.URL");
+        String version = (String) Config.getStorageProperties().get("CELLBASE.VERSION");
+        logger.info("using cellbase: " + url + " version " + version);
+        cellBaseClient = new CellBaseClient(new URI(url), version, "hsapiens");
+    }
+
+    /**
+     * Clears and populates the Mongo collection used during the tests.
+     *
+     * @throws UnknownHostException
+     */
+    @AfterClass
+    public static void tearDownClass() throws UnknownHostException {
+        cleanDBs();
+    }
+
+
     @Test
     public void testVcfHtsExport() throws Exception {
         VariantStorageManager variantStorageManager = StorageManagerFactory.getVariantStorageManager();
@@ -288,34 +316,8 @@ public class VariantExporterTest {
 
     }
 
-    /**
-     * Clears and populates the Mongo collection used during the tests.
-     * @throws java.io.IOException
-     * @throws java.lang.InterruptedException
-     */
-    @BeforeClass
-    public static void setUpClass() throws IOException, InterruptedException, URISyntaxException {
-        cleanDBs();
-        fillDB();
-
-        Config.setOpenCGAHome(System.getenv("OPENCGA_HOME") != null ? System.getenv("OPENCGA_HOME") : "/opt/opencga");
-        String url = (String) Config.getStorageProperties().get("CELLBASE.REST.URL");
-        String version = (String) Config.getStorageProperties().get("CELLBASE.VERSION");
-        logger.info("using cellbase: " + url + " version " + version);
-        cellBaseClient = new CellBaseClient(new URI(url), version, "hsapiens");
-    }
-
-    /**
-     * Clears and populates the Mongo collection used during the tests.
-     *
-     * @throws UnknownHostException
-     */
-    @AfterClass
-    public static void tearDownClass() throws UnknownHostException {
-        cleanDBs();
-    }
-
     private static void cleanDBs() throws UnknownHostException {
+        logger.info("Cleaning test DBs ...");
         MongoClient mongoClient = new MongoClient("localhost");
         List<String> dbs = Arrays.asList(DB_NAME);
         for (String dbName : dbs) {
@@ -389,6 +391,7 @@ public class VariantExporterTest {
     }
 
     private void assertVcfOrderedByCoordinate(String fileName) {
+        logger.info("Checking that {} is sorted by coordinate", fileName);
         Set<String> finishedContigs = new HashSet<>();
         VCFFileReader vcfReader = new VCFFileReader(new File(fileName), false);
         String lastContig = null;
