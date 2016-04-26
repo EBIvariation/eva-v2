@@ -317,16 +317,9 @@ public class VariantExporter {
         }
     }
 
-    // TODO: this method doesnt return a ordered vcf, remove
-    @Deprecated
-    private void dumpVariantsForChromosome(String chromosome, Map<String, VariantSource> sources, Map<String, VariantContextWriter> writers) {
-        QueryOptions chromosomeQuery = addChromosomeAndSortToQuery(chromosome);
-        dumpVariants(sources, writers, chromosomeQuery);
-    }
-
     private void dumpVariants(Map<String, VariantSource> sources, Map<String, VariantContextWriter> writers, QueryOptions query) {
+        query = addProjectionToQuery(query);
         VariantDBIterator variantDBIterator = variantDBAdaptor.iterator(query);
-        // TODO: use projection with file id to reduce network traffic??
         while (variantDBIterator.hasNext()) {
             Variant variant = variantDBIterator.next();
             try {
@@ -347,19 +340,6 @@ public class VariantExporter {
                 logger.info("written variants: " + writtenVariants);
             }
         }
-    }
-
-    private QueryOptions addChromosomeAndSortToQuery(String chromosome) {
-        // TODO: this sort doesnt guarantee the order in the vcf output, remove
-        QueryOptions chromosomeQuery = new QueryOptions(options);
-        chromosomeQuery.put(VariantDBAdaptor.CHROMOSOME, chromosome);
-        BasicDBObject sortDBObject = new BasicDBObject();
-        sortDBObject.put("chr", 1);
-        sortDBObject.put("start", 1);
-        sortDBObject.put("end", -1);
-
-        chromosomeQuery.put("sort", sortDBObject);
-        return chromosomeQuery;
     }
 
     /**
