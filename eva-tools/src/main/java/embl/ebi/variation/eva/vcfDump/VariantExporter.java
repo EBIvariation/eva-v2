@@ -205,11 +205,13 @@ public class VariantExporter {
         logger.debug("Chromosome {} minStart: {}", chromosome, minStart);
 
         List<String> regions = getRegions(chromosome, minStart, maxStart);
-        // TODO: this is for testing, remove
-        regions = regions.subList(0, 20);
+//        // TODO: this is for testing, remove
+//        regions = regions.subList(0, 20);
         logger.debug("Number of regions in chromosome{}: {}", chromosome, regions.size());
-        logger.debug("First region: {}", regions.get(0));
-        logger.debug("Last region: {}", regions.get(regions.size() -1 ));
+        if (!regions.isEmpty()) {
+            logger.debug("First region: {}", regions.get(0));
+            logger.debug("Last region: {}", regions.get(regions.size() - 1));
+        }
 
         return regions;
     }
@@ -251,16 +253,20 @@ public class VariantExporter {
     }
 
     private List<String> getRegions(String chromosome, int minStart, int maxStart) {
-        List<String> regions = new ArrayList<>();
-        int nextStart = minStart;
-        while (nextStart <= maxStart) {
-            StringBuilder sb = new StringBuilder(chromosome);
-            int end = nextStart + WINDOW_SIZE;
-            sb.append(':').append(nextStart).append('-').append(end - 1);
-            regions.add(sb.toString());
-            nextStart = end;
+        if (minStart == -1) {
+            return Collections.EMPTY_LIST;
+        } else {
+            List<String> regions = new ArrayList<>();
+            int nextStart = minStart;
+            while (nextStart <= maxStart) {
+                StringBuilder sb = new StringBuilder(chromosome);
+                int end = nextStart + WINDOW_SIZE;
+                sb.append(':').append(nextStart).append('-').append(end - 1);
+                regions.add(sb.toString());
+                nextStart = end;
+            }
+            return regions;
         }
-        return regions;
     }
 
     private Map<String, List<VariantContext>> dumpVariantsInRegion(String region, Map<String, VariantSource> sources) throws IOException {
@@ -423,9 +429,9 @@ public class VariantExporter {
                 chromosomes = getChromosomesFromVCFHeader(headers, studyIds);
             }
         }
-        // TODO: just for testing, delete
-        chromosomes = new HashSet<>();
-        chromosomes.add("21");
+//        // TODO: just for testing, delete
+//        chromosomes = new HashSet<>();
+//        chromosomes.add("21");
         return chromosomes;
     }
 
