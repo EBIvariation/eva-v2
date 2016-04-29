@@ -70,9 +70,9 @@ public class VariantExporter {
      * Read only. Keeps track of the total failed variants across several dumps. To accumulate, use the same instance of
      * VariantExporter to dump several VCFs. If you just want to count on one dump, use a `new VariantExporter` each time.
      */
-    private int failedVariants = 0;
+    private int failedVariantsTotal = 0;
     private int writtenVariants;
-    private int failedVariants1;
+    private int failedVariants;
     private long totalQuerying = 0;
     private String regionSequence;
 
@@ -85,8 +85,8 @@ public class VariantExporter {
      * If there won't be empty alleles, CellBase is not needed, and the parameter may be null.
      *
      * @param cellbaseClient for empty alleles. nullable.
-     * @param files
-     * @param studies
+     * @param variantDBAdaptor
+     * @param query
      */
     public VariantExporter(CellBaseClient cellbaseClient, VariantDBAdaptor variantDBAdaptor, QueryOptions query) {
         this.cellbaseClient = cellbaseClient;
@@ -154,7 +154,7 @@ public class VariantExporter {
         logger.info("Exporting to files: [" + StringUtils.join(files, " ") + "]");
 
         // actual loop
-        failedVariants1 = 0;
+        failedVariants = 0;
         writtenVariants = 0;
 
         Set<String> chromosomes = getChromosomes(headers, studyIds, options);
@@ -170,10 +170,10 @@ public class VariantExporter {
 
 
         logger.info("total variants written: " + writtenVariants);
-        if (failedVariants1 > 0) {
-            logger.warn(failedVariants1 + " variants were not written due to errors");
+        if (failedVariants > 0) {
+            logger.warn(failedVariants + " variants were not written due to errors");
         }
-        this.failedVariants += failedVariants1;
+        this.failedVariantsTotal += failedVariants;
 
         for (VariantContextWriter variantContextWriter : writers.values()) {
             variantContextWriter.close();
@@ -281,9 +281,10 @@ public class VariantExporter {
                         dumpedVariants.putIfAbsent(variantContext.getKey(), new ArrayList<>());
                         dumpedVariants.get(variantContext.getKey()).add(variantContext.getValue());
                     }
-                } catch (IOException e) {
-                    logger.error("Error dumping variants for region {}: {}", region, e.getMessage());
-                    throw e;
+                } catch (Exception e) {
+                    logger.warn("Variant {}:{}:{}>{} dump failed: {}", variant.getChromosome(), variant.getStart(), variant.getReference(),
+                            variant.getAlternate(), e.getMessage());
+                    failedVariants++;
                 }
                 writtenVariants++;
                 if (writtenVariants % 100000 == 0) {
@@ -337,7 +338,7 @@ public class VariantExporter {
                 logger.info(String.format("Variant dump failed: \"%s:%d:%s>%s\"", variant.getChromosome(),
                         variant.getStart(), variant.getReference(), variant.getAlternate()),
                         e);
-                failedVariants1++;
+                failedVariants++;
             }
             writtenVariants++;
             if (writtenVariants % 100000 == 0) {
@@ -452,7 +453,7 @@ public class VariantExporter {
     }
 
     public int getFailedVariants() {
-        return failedVariants;
+        return failedVariantsTotal;
     }
 
     /**
