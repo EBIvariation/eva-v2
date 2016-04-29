@@ -233,12 +233,12 @@ public class VariantExporterTest {
         removeSrc(variants);    // <---- this is the key point of the test
 
         VariantExporter variantExporter = new VariantExporter(null, null, null);
-        variantContext = variantExporter.convertBiodataVariantToVariantContext(variants.get(0), sources);
+        variantContext = variantExporter.convertBiodataVariantToVariantContext(variants.get(0), sources, null);
 
         alleles = Arrays.asList("C", "A", ".");
         assertEqualGenotypes(variants.get(0), variantContext.get(studyId), alleles);
 
-        variantContext = variantExporter.convertBiodataVariantToVariantContext(variants.get(1), sources);
+        variantContext = variantExporter.convertBiodataVariantToVariantContext(variants.get(1), sources, null);
         alleles = Arrays.asList("C", "T", ".");
         assertEqualGenotypes(variants.get(1), variantContext.get(studyId), alleles);
 
@@ -249,13 +249,13 @@ public class VariantExporterTest {
         assertEquals(2, variants.size());
         removeSrc(variants);    // <---- this is the key point of the test
 
-        variantContext = variantExporter.convertBiodataVariantToVariantContext(variants.get(1), sources);
+        variantContext = variantExporter.convertBiodataVariantToVariantContext(variants.get(1), sources, null);
         alleles = Arrays.asList("C", "T", ".");
         assertEqualGenotypes(variants.get(1), variantContext.get(studyId), alleles);
 
         // the next conversion is the only one that should throw
         thrown.expect(IllegalArgumentException.class);
-        variantExporter.convertBiodataVariantToVariantContext(variants.get(0), sources);
+        variantExporter.convertBiodataVariantToVariantContext(variants.get(0), sources, null);
 
     }
 
@@ -282,12 +282,12 @@ public class VariantExporterTest {
         assertEquals(2, variants.size());
 
         VariantExporter variantExporter = new VariantExporter(cellBaseClient, null, null);
-        variantContext = variantExporter.convertBiodataVariantToVariantContext(variants.get(0), sources);
+        variantContext = variantExporter.convertBiodataVariantToVariantContext(variants.get(0), sources, null);
 
         alleles = Arrays.asList("C", "A", ".");
         assertEqualGenotypes(variants.get(0), variantContext.get(studyId), alleles);
 
-        variantContext = variantExporter.convertBiodataVariantToVariantContext(variants.get(1), sources);
+        variantContext = variantExporter.convertBiodataVariantToVariantContext(variants.get(1), sources, null);
         alleles = Arrays.asList("C", "T", ".");
         assertEqualGenotypes(variants.get(1), variantContext.get(studyId), alleles);
 
@@ -296,7 +296,7 @@ public class VariantExporterTest {
         String indelLine = "1\t1000\tid\tN\tNA\t100\tPASS\t.\tGT\t0|0\t0|0\t0|1\t1|1\t1|0\t0|1";
         variants = factory.create(variantSource, indelLine);
 
-        variantContext = variantExporter.convertBiodataVariantToVariantContext(variants.get(0), sources);
+        variantContext = variantExporter.convertBiodataVariantToVariantContext(variants.get(0), sources, null);
         alleles = Arrays.asList("N", "NA");
         assertEqualGenotypes(variants.get(0), variantContext.get(studyId), alleles);
 
@@ -306,11 +306,11 @@ public class VariantExporterTest {
         variants = factory.create(variantSource, multiallelicIndelLine);
         assertEquals(2, variants.size());
 
-        variantContext = variantExporter.convertBiodataVariantToVariantContext(variants.get(0), sources);
+        variantContext = variantExporter.convertBiodataVariantToVariantContext(variants.get(0), sources, null);
         alleles = Arrays.asList("N", "NA", ".");
         assertEqualGenotypes(variants.get(0), variantContext.get(studyId), alleles);
 
-        variantContext = variantExporter.convertBiodataVariantToVariantContext(variants.get(1), sources);
+        variantContext = variantExporter.convertBiodataVariantToVariantContext(variants.get(1), sources, null);
         alleles = Arrays.asList("N", "T", ".");
         assertEqualGenotypes(variants.get(1), variantContext.get(studyId), alleles);
 

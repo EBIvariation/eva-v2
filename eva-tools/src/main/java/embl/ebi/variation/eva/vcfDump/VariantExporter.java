@@ -74,6 +74,7 @@ public class VariantExporter {
     private int writtenVariants;
     private int failedVariants1;
     private long totalQuerying = 0;
+    private String regionSequence;
 
     /**
      * if the variants will have empty alleles (such as normalized deletions: "A" to "") CellBase is mandatory to
@@ -182,8 +183,9 @@ public class VariantExporter {
     }
 
     private void dumpVariantsForChromosomeUsingRegions(String chromosome, Map<String, VariantSource> sources, Map<String, VariantContextWriter> writers) throws IOException {
-        List<String> allRegionsInChromosome = getRegionsListForChromosome(chromosome);
-        for (String region : allRegionsInChromosome) {
+        List<Region> allRegionsInChromosome = getRegionsListForChromosome(chromosome);
+        for (Region region : allRegionsInChromosome) {
+            regionSequence = null;
             long start = System.currentTimeMillis();
             Map<String, List<VariantContext>> variantsInRegion = dumpVariantsInRegion(region, sources);
             long queryFinished = System.currentTimeMillis();
@@ -198,15 +200,13 @@ public class VariantExporter {
         }
     }
 
-    private List<String> getRegionsListForChromosome(String chromosome) {
+    private List<Region> getRegionsListForChromosome(String chromosome) {
         int minStart = getMinStart(chromosome);
         int maxStart = getMaxStart(chromosome);
         logger.debug("Chromosome {} maxStart: {}", chromosome, maxStart);
         logger.debug("Chromosome {} minStart: {}", chromosome, minStart);
 
-        List<String> regions = getRegions(chromosome, minStart, maxStart);
-//        // TODO: this is for testing, remove
-//        regions = regions.subList(0, 20);
+        List<Region> regions = getRegions(chromosome, minStart, maxStart);
         logger.debug("Number of regions in chromosome{}: {}", chromosome, regions.size());
         if (!regions.isEmpty()) {
             logger.debug("First region: {}", regions.get(0));
@@ -252,39 +252,43 @@ public class VariantExporter {
         return start;
     }
 
-    private List<String> getRegions(String chromosome, int minStart, int maxStart) {
+    private List<Region> getRegions(String chromosome, int minStart, int maxStart) {
         if (minStart == -1) {
             return Collections.EMPTY_LIST;
         } else {
-            List<String> regions = new ArrayList<>();
+            List<Region> regions = new ArrayList<>();
             int nextStart = minStart;
             while (nextStart <= maxStart) {
-                StringBuilder sb = new StringBuilder(chromosome);
                 int end = nextStart + WINDOW_SIZE;
-                sb.append(':').append(nextStart).append('-').append(end - 1);
-                regions.add(sb.toString());
+                regions.add(new Region(chromosome, nextStart, end - 1));
                 nextStart = end;
             }
             return regions;
         }
     }
 
-    private Map<String, List<VariantContext>> dumpVariantsInRegion(String region, Map<String, VariantSource> sources) throws IOException {
+    private Map<String, List<VariantContext>> dumpVariantsInRegion(Region region, Map<String, VariantSource> sources) throws IOException {
         Map<String, List<VariantContext>> dumpedVariants = new HashMap<>();
         QueryOptions regionQuery = addRegionToQuery(region);
         regionQuery = addProjectionToQuery(regionQuery);
         VariantDBIterator variantDBIterator = variantDBAdaptor.iterator(regionQuery);
         while (variantDBIterator.hasNext()) {
             Variant variant = variantDBIterator.next();
-            try {
-                Map<String, VariantContext> variantContexts = convertBiodataVariantToVariantContext(variant, sources);
-                for (Map.Entry<String, VariantContext> variantContext : variantContexts.entrySet()) {
-                    dumpedVariants.putIfAbsent(variantContext.getKey(), new ArrayList<>());
-                    dumpedVariants.get(variantContext.getKey()).add(variantContext.getValue());
+            if (region.contains(variant.getChromosome(), variant.getStart())) {
+                try {
+                    Map<String, VariantContext> variantContexts = convertBiodataVariantToVariantContext(variant, sources, region);
+                    for (Map.Entry<String, VariantContext> variantContext : variantContexts.entrySet()) {
+                        dumpedVariants.putIfAbsent(variantContext.getKey(), new ArrayList<>());
+                        dumpedVariants.get(variantContext.getKey()).add(variantContext.getValue());
+                    }
+                } catch (IOException e) {
+                    logger.error("Error dumping variants for region {}: {}", region, e.getMessage());
+                    throw e;
                 }
-            } catch (IOException e) {
-                logger.error("Error dumping variants for region {}: {}", region, e.getMessage());
-                throw e;
+                writtenVariants++;
+                if (writtenVariants % 100000 == 0) {
+                    logger.info("written variants: " + writtenVariants);
+                }
             }
         }
 
@@ -301,9 +305,9 @@ public class VariantExporter {
         return regionQuery;
     }
 
-    private QueryOptions addRegionToQuery(String region) {
+    private QueryOptions addRegionToQuery(Region region) {
         QueryOptions regionQuery = new QueryOptions(options);
-        regionQuery.put("region", region);
+        regionQuery.put("region", region.toString());
         return regionQuery;
     }
 
@@ -323,7 +327,7 @@ public class VariantExporter {
         while (variantDBIterator.hasNext()) {
             Variant variant = variantDBIterator.next();
             try {
-                Map<String, VariantContext> variantContexts = convertBiodataVariantToVariantContext(variant, sources);
+                Map<String, VariantContext> variantContexts = convertBiodataVariantToVariantContext(variant, sources, null);
                 for (Map.Entry<String, VariantContext> variantContextEntry : variantContexts.entrySet()) {
                     if (writers.containsKey(variantContextEntry.getKey())) {
                         writers.get(variantContextEntry.getKey()).add(variantContextEntry.getValue());
@@ -409,9 +413,7 @@ public class VariantExporter {
                 chromosomes = getChromosomesFromVCFHeader(headers, studyIds);
             }
         }
-//        // TODO: just for testing, delete
-//        chromosomes = new HashSet<>();
-//        chromosomes.add("21");
+
         return chromosomes;
     }
 
@@ -471,7 +473,7 @@ public class VariantExporter {
      * @return
      */
     public Map<String, VariantContext> convertBiodataVariantToVariantContext(
-            Variant variant, Map<String, VariantSource> sources) throws IOException {
+            Variant variant, Map<String, VariantSource> sources, Region region) throws IOException {
         int missingGenotypes = 0;
         Set<String> studyIds = sources.keySet();
         Map<String, VariantContext> variantContextMap = new TreeMap<>();
@@ -507,7 +509,12 @@ public class VariantExporter {
                 }
 
                 if (emptyAlleles) {
-                    String contextNucleotide = getContextNucleotideFromCellbase(variant, start, studyId);
+                    String contextNucleotide;
+                    if (region != null) {
+                        contextNucleotide = getContextNucleotideFromCellbaseCachingRegions(variant, start, region, studyId);
+                    } else {
+                        contextNucleotide = getContextNucleotideFromCellbase(variant, start, studyId);
+                    }
                     allelesArray.set(0, contextNucleotide + reference);
                     allelesArray.set(1, contextNucleotide + alternate);
                     end = start + allelesArray.get(0).length()-1;   // -1 because end is inclusive. [start, end] instead of [start, end)
@@ -577,5 +584,41 @@ public class VariantExporter {
                     variant.getChromosome(), variant.getStart(), variant.getReference(), variant.getAlternate()));
         }
     }
+
+    private String getContextNucleotideFromCellbaseCachingRegions(Variant variant, int start, Region region, String studyId) throws IOException {
+        if (cellbaseClient != null) {
+            try {
+                if (regionSequence == null) {
+                    // if an indel start is the first nucleotide of the region, we will need the previous nucleotide, so we are adding
+                    // the preceding nucleotide to the region (region.getStart()-1)
+                    Region sequenceRegion = new Region(region.getChromosome(), region.getStart()-1, region.getEnd());
+                    List<Region> regions = Collections.singletonList(sequenceRegion);
+
+                    QueryResponse<QueryResult<GenomeSequenceFeature>> sequence = cellbaseClient.getSequence(
+                            CellBaseClient.Category.genomic, CellBaseClient.SubCategory.region, regions, null);
+
+                    List<GenomeSequenceFeature> response = sequence.getResponse().get(0).getResult();
+                    if (response.size() == 1) {
+                        regionSequence = response.get(0).getSequence();
+                    }
+                }
+                String nucleotide = getNucleotideFromRegionSequence(start, region.getStart(), regionSequence);
+                return nucleotide;
+            } catch (Exception e) {
+                logger.error("Getting nucleotide for variant {} in region {} using start {}: {}", variant, region, start, e.getMessage());
+                throw e;
+            }
+        } else {
+            throw new IllegalArgumentException(String.format(
+                    "CellBase was not provided, needed to fill empty alleles at study %s, in variant %s:%d:%s>%s", studyId,
+                    variant.getChromosome(), variant.getStart(), variant.getReference(), variant.getAlternate()));
+        }
+    }
+
+    private String getNucleotideFromRegionSequence(int start, int regionStart, String regionSequence) {
+        int relativePosition = start - regionStart;
+        return regionSequence.substring(relativePosition, relativePosition + 1);
+    }
+
 
 }
