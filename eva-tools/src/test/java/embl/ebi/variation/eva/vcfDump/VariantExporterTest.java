@@ -192,6 +192,38 @@ public class VariantExporterTest {
     }
 
     @Test
+    public void testFilterUsingIntersectingRegions() throws Exception {
+        List<String> files = Arrays.asList("5");
+        List<String> studies = Arrays.asList("7");
+        QueryOptions query = getQuery(files, studies);
+        String outputDir = "/tmp/";
+
+        // tell all variables to filter with
+        query.put(VariantDBAdaptor.REGION, "20:61000-66000,20:63000-69000");
+
+        VariantStorageManager variantStorageManager = StorageManagerFactory.getVariantStorageManager();
+        VariantDBAdaptor variantDBAdaptor = variantStorageManager.getDBAdaptor(DB_NAME, null);
+        VariantSourceDBAdaptor variantSourceDBAdaptor = variantDBAdaptor.getVariantSourceDBAdaptor();
+
+        VariantExporter variantExporter = new VariantExporter(cellBaseClient, variantDBAdaptor, query);
+        List<String> outputFiles = variantExporter.VcfHtsExport(outputDir, variantSourceDBAdaptor);
+
+        ////////// checks
+
+        assertEquals(studies.size(), outputFiles.size());
+        assertEquals(0, variantExporter.getFailedVariants());   // test file should not have failed variants
+
+        VariantDBIterator iterator = variantDBAdaptor.iterator(query);
+        assertEqualLinesFilesAndDB(outputFiles, iterator);
+
+        for (String outputFile : outputFiles) {
+            assertVcfOrderedByCoordinate(outputFile);
+            boolean delete = new File(outputFile).delete();
+            assertTrue(delete);
+        }
+    }
+
+    @Test
     public void testMissingStudy() throws Exception {
         List<String> files = Arrays.asList("5");
         List<String> studies = Arrays.asList("7", "9"); // study 9 doesn't exist
