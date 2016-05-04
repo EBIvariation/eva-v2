@@ -51,6 +51,7 @@ import java.io.File;
 import java.io.IOException;
 import java.nio.file.Paths;
 import java.util.*;
+import java.util.stream.Collector;
 import java.util.stream.Collectors;
 
 /**
@@ -63,6 +64,7 @@ public class VariantExporter {
     private static final Logger logger = LoggerFactory.getLogger(VariantExporter.class);
     private static final int WINDOW_SIZE = 20000;
     private final QueryOptions options;
+    private final RegionDivider regionDivider;
 
     private CellBaseClient cellbaseClient;
     private VariantDBAdaptor variantDBAdaptor;
@@ -75,6 +77,7 @@ public class VariantExporter {
     private int failedVariants;
     private long totalQuerying = 0;
     private String regionSequence;
+    private List<Region> regionsInFilter;
 
     /**
      * if the variants will have empty alleles (such as normalized deletions: "A" to "") CellBase is mandatory to
@@ -92,6 +95,7 @@ public class VariantExporter {
         this.cellbaseClient = cellbaseClient;
         this.variantDBAdaptor = variantDBAdaptor;
         this.options = query;
+        this.regionDivider = new RegionDivider(WINDOW_SIZE);
     }
 
     /**
@@ -183,7 +187,7 @@ public class VariantExporter {
     }
 
     private void dumpVariantsForChromosomeUsingRegions(String chromosome, Map<String, VariantSource> sources, Map<String, VariantContextWriter> writers) throws IOException {
-        List<Region> allRegionsInChromosome = getRegionsListForChromosome(chromosome);
+        List<Region> allRegionsInChromosome = getRegionsForChromosome(chromosome, options);
         for (Region region : allRegionsInChromosome) {
             regionSequence = null;
             long start = System.currentTimeMillis();
@@ -200,20 +204,26 @@ public class VariantExporter {
         }
     }
 
-    private List<Region> getRegionsListForChromosome(String chromosome) {
+    private List<Region> getRegionsForChromosome(String chromosome, QueryOptions queryOptions) {
+        String regionFilter = queryOptions.getString("region");
+
         int minStart = getMinStart(chromosome);
         int maxStart = getMaxStart(chromosome);
         logger.debug("Chromosome {} maxStart: {}", chromosome, maxStart);
         logger.debug("Chromosome {} minStart: {}", chromosome, minStart);
 
-        List<Region> regions = getRegions(chromosome, minStart, maxStart);
-        logger.debug("Number of regions in chromosome{}: {}", chromosome, regions.size());
-        if (!regions.isEmpty()) {
-            logger.debug("First region: {}", regions.get(0));
-            logger.debug("Last region: {}", regions.get(regions.size() - 1));
+        if (regionFilter == null || regionFilter.isEmpty()) {
+            return getRegionsForChromosome(chromosome, minStart, maxStart);
+        } else {
+            List<Region> chromosomeRegionsFromQuery =
+                    getRegionsFromQuery(regionFilter).stream().filter(r -> r.getChromosome().equals(chromosome)).collect(Collectors.toList());
+
+            String commaSeparatedRegionList = chromosomeRegionsFromQuery.stream().map(Region::toString).collect(Collectors.joining(", "));
+            logger.debug("Chromosome {} regions from query: {}", chromosome, commaSeparatedRegionList);
+
+            return getRegionsListForQueryRegions(chromosomeRegionsFromQuery);
         }
 
-        return regions;
     }
 
     private int getMinStart(String chromosome) {
@@ -224,6 +234,33 @@ public class VariantExporter {
     private int getMaxStart(String chromosome) {
         QueryOptions maxQuery = addChromosomeSortAndLimitToQuery(chromosome, false);
         return getVariantStart(maxQuery);
+    }
+
+    private List<Region> getRegionsFromQuery(String regionFilter) {
+        if (regionsInFilter == null) {
+            regionsInFilter = Region.parseRegions(regionFilter);
+            // TODO: merge regions and sort by start
+        }
+        return regionsInFilter;
+    }
+
+    private List<Region> getRegionsForChromosome(String chromosome, int chromosomeMinStart, int chromosomeMaxStart) {
+        List<Region> regions = regionDivider.divideRegionInChunks(chromosome, chromosomeMinStart, chromosomeMaxStart);
+        logger.debug("Number of regions in chromosome{}: {}", chromosome, regions.size());
+        if (!regions.isEmpty()) {
+            logger.debug("First region: {}", regions.get(0));
+            logger.debug("Last region: {}", regions.get(regions.size() - 1));
+        }
+
+        return regions;
+    }
+
+    private List<Region> getRegionsListForQueryRegions(List<Region> regionsFromQuery) {
+        List<Region> regions = new ArrayList<>();
+        for (Region region : regionsFromQuery) {
+            regions.addAll(regionDivider.divideRegionInChunks(region));
+        }
+        return regions;
     }
 
     private QueryOptions addChromosomeSortAndLimitToQuery(String chromosome, boolean ascending) {
@@ -252,20 +289,6 @@ public class VariantExporter {
         return start;
     }
 
-    private List<Region> getRegions(String chromosome, int minStart, int maxStart) {
-        if (minStart == -1) {
-            return Collections.EMPTY_LIST;
-        } else {
-            List<Region> regions = new ArrayList<>();
-            int nextStart = minStart;
-            while (nextStart <= maxStart) {
-                int end = nextStart + WINDOW_SIZE;
-                regions.add(new Region(chromosome, nextStart, end - 1));
-                nextStart = end;
-            }
-            return regions;
-        }
-    }
 
     private Map<String, List<VariantContext>> dumpVariantsInRegion(Region region, Map<String, VariantSource> sources) throws IOException {
         Map<String, List<VariantContext>> dumpedVariants = new HashMap<>();
