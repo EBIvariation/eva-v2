@@ -1,4 +1,4 @@
-package embl.ebi.variation.eva.vcfDump;
+package embl.ebi.variation.eva.vcfDump.regionUtils;
 
 import org.opencb.biodata.models.feature.Region;
 

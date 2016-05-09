@@ -16,6 +16,8 @@
 package embl.ebi.variation.eva.vcfDump;
 
 import com.mongodb.BasicDBObject;
+import embl.ebi.variation.eva.vcfDump.regionUtils.IntersectingRegionsMerger;
+import embl.ebi.variation.eva.vcfDump.regionUtils.RegionDivider;
 import htsjdk.samtools.SAMSequenceDictionary;
 import htsjdk.samtools.SAMSequenceRecord;
 import htsjdk.tribble.FeatureCodecHeader;
@@ -51,7 +53,6 @@ import java.io.File;
 import java.io.IOException;
 import java.nio.file.Paths;
 import java.util.*;
-import java.util.stream.Collector;
 import java.util.stream.Collectors;
 
 /**
@@ -216,12 +217,13 @@ public class VariantExporter {
             return getRegionsForChromosome(chromosome, minStart, maxStart);
         } else {
             List<Region> chromosomeRegionsFromQuery =
-                    getRegionsFromQuery(regionFilter).stream().filter(r -> r.getChromosome().equals(chromosome)).collect(Collectors.toList());
+                    getRegionsFromQuery(regionFilter).stream().filter(r -> r.getChromosome().equals(chromosome)).collect(new IntersectingRegionsMerger());
 
             String commaSeparatedRegionList = chromosomeRegionsFromQuery.stream().map(Region::toString).collect(Collectors.joining(", "));
             logger.debug("Chromosome {} regions from query: {}", chromosome, commaSeparatedRegionList);
 
             return getRegionsListForQueryRegions(chromosomeRegionsFromQuery);
+
         }
 
     }
@@ -239,10 +241,11 @@ public class VariantExporter {
     private List<Region> getRegionsFromQuery(String regionFilter) {
         if (regionsInFilter == null) {
             regionsInFilter = Region.parseRegions(regionFilter);
-            // TODO: merge regions and sort by start
         }
         return regionsInFilter;
     }
+
+
 
     private List<Region> getRegionsForChromosome(String chromosome, int chromosomeMinStart, int chromosomeMaxStart) {
         List<Region> regions = regionDivider.divideRegionInChunks(chromosome, chromosomeMinStart, chromosomeMaxStart);
