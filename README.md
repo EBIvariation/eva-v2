@@ -87,11 +87,15 @@ the command line, like this:
 * `compressExtension`: usually `.gz`.
 * `includeSrc`: Allowed values: [NO, FIRST_8_COLUMNS, FULL]. See org.opencb.opencga.storage.core.variant.VariantStorageManager.IncludeSrc.
 
-* `vepInput`: where to write the future input to VEP, i.e. the list of variants to annotate.
-* `vepPath`: complete path to `variant_effect_predictor.pl`
+* `vepInput`: Path where the future input for VEP, i.e. the list of variants to annotate, will be generated.
+* `vepOutput`: Path to the file that will contain the annotated variants.
+* `vepPath`: Full path to the `variant_effect_predictor.pl` script.
 * `vepParameters`: See http://www.ensembl.org/info/docs/tools/vep/script/vep_options.html
-* `vepFasta`: Add the `--fasta ...` option here.
-* `vepOutput`: name of the future file of annotated variants.
+* `vepCacheDirectory`: Path to the VEP cache root folder.
+* `vepCacheVersion`: Version of the VEP cache.
+* `vepSpecies`: Name of the species as stored in the cache folder.
+* `vepFasta`: Path to the FASTA file with the reference sequence.
+* `vepNumForks`: Number of forks to run VEP concurrently (recommended 4).
 
 #### Metadata
 * `studyId`: unique identifier of the study.
