@@ -15,7 +15,7 @@
  */
 package embl.ebi.variation.eva.vcfdump;
 
-import org.opencb.cellbase.core.client.CellBaseClient;
+import embl.ebi.variation.eva.vcfdump.cellbasewsclient.CellbaseWSClient;
 import org.opencb.datastore.core.QueryOptions;
 import org.opencb.opencga.lib.common.Config;
 import org.opencb.opencga.storage.core.StorageManagerException;
@@ -37,7 +37,7 @@ import java.util.List;
  */
 public class VariantExporterController {
 
-    private final CellBaseClient cellBaseClient;
+    private final CellbaseWSClient cellBaseClient;
     private final List<String> studies;
     private final List<String> files;
     private final String outputDir;
@@ -51,17 +51,10 @@ public class VariantExporterController {
         this.studies = studies;
         this.files = files;
         this.outputDir = outputDir;
-        cellBaseClient = getCellBaseClient(species);
+        cellBaseClient = new CellbaseWSClient(species);
         variantDBAdaptor = getVariantDBAdaptor(dbName);
         query = getQuery(queryParameters);
         variantSourceDBAdaptor = variantDBAdaptor.getVariantSourceDBAdaptor();
-    }
-
-    public CellBaseClient getCellBaseClient(String species) throws URISyntaxException {
-        String url = (String) Config.getStorageProperties().get("CELLBASE.REST.URL");
-        String version = (String) Config.getStorageProperties().get("CELLBASE.VERSION");
-        CellBaseClient cellBaseClient = new CellBaseClient(new URI(url), version, species);
-        return cellBaseClient;
     }
 
     public VariantDBAdaptor getVariantDBAdaptor(String dbName) throws StorageManagerException, IllegalAccessException, ClassNotFoundException, InstantiationException {
@@ -88,7 +81,7 @@ public class VariantExporterController {
     }
 
     public List<String> run() throws URISyntaxException, IOException {
-        return new VariantExporter(cellBaseClient, variantDBAdaptor, query).VcfHtsExport(outputDir, variantSourceDBAdaptor);
+        return new VariantExporter(cellBaseClient, variantDBAdaptor, query).vcfExport(outputDir, variantSourceDBAdaptor);
     }
 
 }

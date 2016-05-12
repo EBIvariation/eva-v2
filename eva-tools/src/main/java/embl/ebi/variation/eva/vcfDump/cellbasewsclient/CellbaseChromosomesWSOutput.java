@@ -13,7 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package embl.ebi.variation.eva.vcfdump;
+package embl.ebi.variation.eva.vcfdump.cellbasewsclient;
 
 import org.opencb.cellbase.core.common.core.Chromosome;
 

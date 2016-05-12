@@ -17,6 +17,7 @@ package embl.ebi.variation.eva.vcfdump;
 
 import com.mongodb.DB;
 import com.mongodb.MongoClient;
+import embl.ebi.variation.eva.vcfdump.cellbasewsclient.CellbaseWSClient;
 import htsjdk.variant.variantcontext.Allele;
 import htsjdk.variant.variantcontext.Genotype;
 import htsjdk.variant.variantcontext.VariantContext;
@@ -27,7 +28,6 @@ import org.junit.Test;
 import org.junit.rules.ExpectedException;
 import htsjdk.variant.vcf.VCFFileReader;
 import org.opencb.biodata.models.variant.*;
-import org.opencb.cellbase.core.client.CellBaseClient;
 import org.opencb.datastore.core.QueryOptions;
 import org.opencb.opencga.lib.common.Config;
 import org.opencb.opencga.storage.core.StorageManagerFactory;
@@ -39,7 +39,6 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.*;
-import java.net.URI;
 import java.net.URISyntaxException;
 import java.net.UnknownHostException;
 import java.util.*;
@@ -61,7 +60,7 @@ public class VariantExporterTest {
 
     @Rule
     public ExpectedException thrown = ExpectedException.none();
-    private static CellBaseClient cellBaseClient;
+    private static CellbaseWSClient cellBaseClient;
 
     /**
      * Clears and populates the Mongo collection used during the tests.
@@ -74,10 +73,8 @@ public class VariantExporterTest {
         fillDB();
 
         Config.setOpenCGAHome(System.getenv("OPENCGA_HOME") != null ? System.getenv("OPENCGA_HOME") : "/opt/opencga");
-        String url = (String) Config.getStorageProperties().get("CELLBASE.REST.URL");
-        String version = (String) Config.getStorageProperties().get("CELLBASE.VERSION");
-        logger.info("using cellbase: " + url + " version " + version);
-        cellBaseClient = new CellBaseClient(new URI(url), version, "hsapiens");
+        cellBaseClient = new CellbaseWSClient("hsapiens");
+        logger.info("using cellbase: " + cellBaseClient.getUrl() + " version " + cellBaseClient.getVersion());
     }
 
     /**
@@ -102,7 +99,7 @@ public class VariantExporterTest {
         QueryOptions query = getQuery(files, studies);
         VariantExporter variantExporter = new VariantExporter(cellBaseClient, variantDBAdaptor, query);
         String outputDir = "/tmp/";
-        List<String> outputFiles = variantExporter.VcfHtsExport(outputDir, variantSourceDBAdaptor);
+        List<String> outputFiles = variantExporter.vcfExport(outputDir, variantSourceDBAdaptor);
 
         ////// checks
         assertEquals(studies.size(), outputFiles.size());
@@ -132,7 +129,7 @@ public class VariantExporterTest {
         VariantSourceDBAdaptor variantSourceDBAdaptor = variantDBAdaptor.getVariantSourceDBAdaptor();
 
         VariantExporter variantExporter = new VariantExporter(cellBaseClient, variantDBAdaptor, query);
-        List<String> outputFiles = variantExporter.VcfHtsExport(outputDir, variantSourceDBAdaptor);
+        List<String> outputFiles = variantExporter.vcfExport(outputDir, variantSourceDBAdaptor);
 
         ////////// checks
 
@@ -174,7 +171,7 @@ public class VariantExporterTest {
         VariantSourceDBAdaptor variantSourceDBAdaptor = variantDBAdaptor.getVariantSourceDBAdaptor();
 
         VariantExporter variantExporter = new VariantExporter(cellBaseClient, variantDBAdaptor, query);
-        List<String> outputFiles = variantExporter.VcfHtsExport(outputDir, variantSourceDBAdaptor);
+        List<String> outputFiles = variantExporter.vcfExport(outputDir, variantSourceDBAdaptor);
 
         ////////// checks
 
@@ -206,7 +203,7 @@ public class VariantExporterTest {
         VariantSourceDBAdaptor variantSourceDBAdaptor = variantDBAdaptor.getVariantSourceDBAdaptor();
 
         VariantExporter variantExporter = new VariantExporter(cellBaseClient, variantDBAdaptor, query);
-        List<String> outputFiles = variantExporter.VcfHtsExport(outputDir, variantSourceDBAdaptor);
+        List<String> outputFiles = variantExporter.vcfExport(outputDir, variantSourceDBAdaptor);
 
         ////////// checks
 
@@ -238,7 +235,7 @@ public class VariantExporterTest {
         VariantExporter variantExporter = new VariantExporter(cellBaseClient, variantDBAdaptor, query);
 
         thrown.expect(IllegalArgumentException.class);  // comment this line to see the actual exception, making the test fail
-        variantExporter.VcfHtsExport(outputDir, variantSourceDBAdaptor);
+        variantExporter.vcfExport(outputDir, variantSourceDBAdaptor);
     }
 
     @Test

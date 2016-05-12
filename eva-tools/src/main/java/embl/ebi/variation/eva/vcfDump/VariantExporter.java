@@ -16,6 +16,7 @@
 package embl.ebi.variation.eva.vcfdump;
 
 import com.mongodb.BasicDBObject;
+import embl.ebi.variation.eva.vcfdump.cellbasewsclient.CellbaseWSClient;
 import embl.ebi.variation.eva.vcfdump.regionutils.IntersectingRegionsMerger;
 import embl.ebi.variation.eva.vcfdump.regionutils.RegionDivider;
 import htsjdk.samtools.SAMSequenceDictionary;
@@ -45,10 +46,6 @@ import org.opencb.opencga.storage.mongodb.variant.DBObjectToVariantSourceConvert
 import org.opencb.opencga.storage.mongodb.variant.VariantMongoDBAdaptor;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.core.ParameterizedTypeReference;
-import org.springframework.http.HttpMethod;
-import org.springframework.http.ResponseEntity;
-import org.springframework.web.client.RestTemplate;
 
 import java.io.ByteArrayInputStream;
 import java.io.File;
@@ -69,7 +66,7 @@ public class VariantExporter {
     private final QueryOptions options;
     private final RegionDivider regionDivider;
 
-    private CellBaseClient cellbaseClient;
+    private CellbaseWSClient cellbaseClient;
     private VariantDBAdaptor variantDBAdaptor;
     /**
      * Read only. Keeps track of the total failed variants across several dumps. To accumulate, use the same instance of
@@ -89,12 +86,11 @@ public class VariantExporter {
      * This context may be different from the alleles in the original VCF.
      *
      * If there won't be empty alleles, CellBase is not needed, and the parameter may be null.
-     *
-     * @param cellbaseClient for empty alleles. nullable.
+     *  @param cellbaseClient for empty alleles. nullable.
      * @param variantDBAdaptor
      * @param query
      */
-    public VariantExporter(CellBaseClient cellbaseClient, VariantDBAdaptor variantDBAdaptor, QueryOptions query) {
+    public VariantExporter(CellbaseWSClient cellbaseClient, VariantDBAdaptor variantDBAdaptor, QueryOptions query) {
         this.cellbaseClient = cellbaseClient;
         this.variantDBAdaptor = variantDBAdaptor;
         this.options = query;
@@ -110,7 +106,7 @@ public class VariantExporter {
      * @param sourceDBAdaptor to retrieve all the VariantSources in any VariantSourceEntry
      * @return list of files written, one per study.
      */
-    public List<String> VcfHtsExport(String outputDir, VariantSourceDBAdaptor sourceDBAdaptor) throws IOException {
+    public List<String> vcfExport(String outputDir, VariantSourceDBAdaptor sourceDBAdaptor) throws IOException {
 
         // 3 steps to get the headers of all the studyIds: ask the sourceAdaptor for VariantSources, check we got everything, build the headers.
         List<String> studyIds = options.getAsStringList(VariantDBAdaptor.STUDIES);
@@ -439,7 +435,7 @@ public class VariantExporter {
         if (regions.size() > 0) {
             chromosomes = getChromosomesFromRegionFilter(regions);
         } else {
-            chromosomes = getChromosomesFromCellbaseREST();
+            chromosomes = cellbaseClient.getChromosomes();
             if (chromosomes == null || chromosomes.isEmpty()) {
                 chromosomes = getChromosomesFromVCFHeader(headers, studyIds);
             }
@@ -450,24 +446,6 @@ public class VariantExporter {
 
     private Set<String> getChromosomesFromRegionFilter(List<String> regions) {
         return regions.stream().map(r -> r.split(":")[0]).collect(Collectors.toSet());
-    }
-
-    private Set<String> getChromosomesFromCellbaseREST() {
-        // call cellbase chromosomes WS
-        RestTemplate restTemplate = new RestTemplate();
-        ParameterizedTypeReference<QueryResponse<QueryResult<CellbaseChromosomesWSOutput>>> responseType =
-                new ParameterizedTypeReference<QueryResponse<QueryResult<CellbaseChromosomesWSOutput>>>() {};
-        // TODO: property file or command line option for cellbase rest URL? OPENCGA?
-        ResponseEntity<QueryResponse<QueryResult<CellbaseChromosomesWSOutput>>> wsOutput =
-                restTemplate.exchange("http://bioinfo.hpc.cam.ac.uk/cellbase/webservices/rest/v3/hsapiens/genomic/chromosome/all",
-                        HttpMethod.GET, null, responseType);
-
-        // parse WS output and return all chromosome names
-        QueryResponse<QueryResult<CellbaseChromosomesWSOutput>> response = wsOutput.getBody();
-        QueryResult<CellbaseChromosomesWSOutput> result = response.getResponse().get(0);
-        CellbaseChromosomesWSOutput results = result.getResult().get(0);
-        return results.getAllChromosomeNames();
-
     }
 
     private Set<String> getChromosomesFromVCFHeader(Map<String, VCFHeader> headers, List<String> studyIds) {
@@ -598,17 +576,7 @@ public class VariantExporter {
 
     private String getContextNucleotideFromCellbase(Variant variant, Integer start, String studyId) throws IOException {
         if (cellbaseClient != null) {
-            String nucleotide = null;
-            List<Region> regions = Collections.singletonList(new Region(variant.getChromosome(), start - 1, start-1));
-
-            QueryResponse<QueryResult<GenomeSequenceFeature>> sequence = cellbaseClient.getSequence(
-                    CellBaseClient.Category.genomic, CellBaseClient.SubCategory.region, regions, null);
-
-            List<GenomeSequenceFeature> response = sequence.getResponse().get(0).getResult();
-            if (response.size() == 1) {
-                nucleotide = response.get(0).getSequence();
-            }
-            return nucleotide;
+            return cellbaseClient.getSequence(new Region(variant.getChromosome(), start - 1, start-1));
         } else {
             throw new IllegalArgumentException(String.format(
                     "CellBase was not provided, needed to fill empty alleles at study %s, in variant %s:%d:%s>%s", studyId,
@@ -622,16 +590,7 @@ public class VariantExporter {
                 if (regionSequence == null) {
                     // if an indel start is the first nucleotide of the region, we will need the previous nucleotide, so we are adding
                     // the preceding nucleotide to the region (region.getStart()-1)
-                    Region sequenceRegion = new Region(region.getChromosome(), region.getStart()-1, region.getEnd());
-                    List<Region> regions = Collections.singletonList(sequenceRegion);
-
-                    QueryResponse<QueryResult<GenomeSequenceFeature>> sequence = cellbaseClient.getSequence(
-                            CellBaseClient.Category.genomic, CellBaseClient.SubCategory.region, regions, null);
-
-                    List<GenomeSequenceFeature> response = sequence.getResponse().get(0).getResult();
-                    if (response.size() == 1) {
-                        regionSequence = response.get(0).getSequence();
-                    }
+                    regionSequence = cellbaseClient.getSequence(new Region(variant.getChromosome(), region.getStart()-1, region.getEnd()));
                 }
                 String nucleotide = getNucleotideFromRegionSequence(start, region.getStart(), regionSequence);
                 return nucleotide;
