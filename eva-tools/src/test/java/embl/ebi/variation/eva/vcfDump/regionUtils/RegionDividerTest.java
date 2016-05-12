@@ -1,6 +1,5 @@
-package embl.ebi.variation.eva.vcfDump.regionUtils;
+package embl.ebi.variation.eva.vcfdump.regionutils;
 
-import embl.ebi.variation.eva.vcfDump.regionUtils.RegionDivider;
 import org.junit.BeforeClass;
 import org.junit.Test;
 import org.opencb.biodata.models.feature.Region;

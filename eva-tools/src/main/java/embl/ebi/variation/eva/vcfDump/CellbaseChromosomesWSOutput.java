@@ -1,4 +1,4 @@
-package embl.ebi.variation.eva.vcfDump;
+package embl.ebi.variation.eva.vcfdump;
 
 import org.opencb.cellbase.core.common.core.Chromosome;
 
