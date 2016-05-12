@@ -13,11 +13,11 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package embl.ebi.variation.eva.vcfDump;
+package embl.ebi.variation.eva.vcfdump;
 
 import com.mongodb.BasicDBObject;
-import embl.ebi.variation.eva.vcfDump.regionUtils.IntersectingRegionsMerger;
-import embl.ebi.variation.eva.vcfDump.regionUtils.RegionDivider;
+import embl.ebi.variation.eva.vcfdump.regionutils.IntersectingRegionsMerger;
+import embl.ebi.variation.eva.vcfdump.regionutils.RegionDivider;
 import htsjdk.samtools.SAMSequenceDictionary;
 import htsjdk.samtools.SAMSequenceRecord;
 import htsjdk.tribble.FeatureCodecHeader;
