@@ -40,7 +40,9 @@ import org.opencb.datastore.core.QueryResult;
 import org.opencb.opencga.storage.core.variant.adaptors.VariantDBAdaptor;
 import org.opencb.opencga.storage.core.variant.adaptors.VariantDBIterator;
 import org.opencb.opencga.storage.core.variant.adaptors.VariantSourceDBAdaptor;
+import org.opencb.opencga.storage.mongodb.variant.DBObjectToVariantConverter;
 import org.opencb.opencga.storage.mongodb.variant.DBObjectToVariantSourceConverter;
+import org.opencb.opencga.storage.mongodb.variant.VariantMongoDBAdaptor;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.core.ParameterizedTypeReference;
@@ -327,8 +329,10 @@ public class VariantExporter {
     }
 
     private QueryOptions addProjectionToQuery(QueryOptions regionQuery) {
-        // TODO: do we need cohortStarts?
-        regionQuery.put("include", "reference,alternative,start,end,chromosome,sourceEntries.cohortStats,sourceEntries");
+        String fieldsToInclude = String.join(",", Arrays.asList(VariantMongoDBAdaptor.REFERENCE, "alternative",
+                DBObjectToVariantConverter.START_FIELD, DBObjectToVariantConverter.END_FIELD, VariantMongoDBAdaptor.CHROMOSOME,
+                "sourceEntries"));
+        regionQuery.put("include", fieldsToInclude);
         return regionQuery;
     }
 
