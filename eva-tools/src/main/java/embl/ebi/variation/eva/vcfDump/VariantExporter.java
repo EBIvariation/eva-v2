@@ -305,14 +305,14 @@ public class VariantExporter {
                         dumpedVariants.putIfAbsent(variantContext.getKey(), new ArrayList<>());
                         dumpedVariants.get(variantContext.getKey()).add(variantContext.getValue());
                     }
+                    writtenVariants++;
+                    if (writtenVariants % 100000 == 0) {
+                        logger.info("written variants: " + writtenVariants);
+                    }
                 } catch (Exception e) {
                     logger.warn("Variant {}:{}:{}>{} dump failed: {}", variant.getChromosome(), variant.getStart(), variant.getReference(),
                             variant.getAlternate(), e.getMessage());
                     failedVariants++;
-                }
-                writtenVariants++;
-                if (writtenVariants % 100000 == 0) {
-                    logger.info("written variants: " + writtenVariants);
                 }
             }
         }
