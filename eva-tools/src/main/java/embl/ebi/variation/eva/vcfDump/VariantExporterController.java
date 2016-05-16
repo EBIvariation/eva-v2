@@ -13,10 +13,9 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package embl.ebi.variation.eva.vcfDump;
+package embl.ebi.variation.eva.vcfdump;
 
-import org.opencb.biodata.models.variant.Variant;
-import org.opencb.cellbase.core.client.CellBaseClient;
+import embl.ebi.variation.eva.vcfdump.cellbasewsclient.CellbaseWSClient;
 import org.opencb.datastore.core.QueryOptions;
 import org.opencb.opencga.lib.common.Config;
 import org.opencb.opencga.storage.core.StorageManagerException;
@@ -29,7 +28,6 @@ import javax.ws.rs.core.MultivaluedMap;
 import java.io.IOException;
 import java.net.URI;
 import java.net.URISyntaxException;
-import java.util.Iterator;
 import java.util.List;
 
 /**
@@ -39,28 +37,24 @@ import java.util.List;
  */
 public class VariantExporterController {
 
-    private final CellBaseClient cellBaseClient;
-    private final Iterator<Variant> iterator;
+    private final CellbaseWSClient cellBaseClient;
+    private final List<String> studies;
+    private final List<String> files;
     private final String outputDir;
     private final VariantSourceDBAdaptor variantSourceDBAdaptor;
+    private final VariantDBAdaptor variantDBAdaptor;
     private final QueryOptions query;
 
     public VariantExporterController(String species, String dbName, List<String> studies, List<String> files,
                                      String outputDir, MultivaluedMap<String, String> queryParameters)
             throws IllegalAccessException, ClassNotFoundException, InstantiationException, StorageManagerException, URISyntaxException {
+        this.studies = studies;
+        this.files = files;
         this.outputDir = outputDir;
-        cellBaseClient = getCellBaseClient(species);
-        VariantDBAdaptor variantDBAdaptor = getVariantDBAdaptor(dbName);
-        query = getQuery(studies, files, queryParameters);
-        iterator = variantDBAdaptor.iterator(query);
+        cellBaseClient = new CellbaseWSClient(species);
+        variantDBAdaptor = getVariantDBAdaptor(dbName);
+        query = getQuery(queryParameters);
         variantSourceDBAdaptor = variantDBAdaptor.getVariantSourceDBAdaptor();
-    }
-
-    public CellBaseClient getCellBaseClient(String species) throws URISyntaxException {
-        String url = (String) Config.getStorageProperties().get("CELLBASE.REST.URL");
-        String version = (String) Config.getStorageProperties().get("CELLBASE.VERSION");
-        CellBaseClient cellBaseClient = new CellBaseClient(new URI(url), version, species);
-        return cellBaseClient;
     }
 
     public VariantDBAdaptor getVariantDBAdaptor(String dbName) throws StorageManagerException, IllegalAccessException, ClassNotFoundException, InstantiationException {
@@ -68,7 +62,7 @@ public class VariantExporterController {
         return variantStorageManager.getDBAdaptor(dbName, null);
     }
 
-    public QueryOptions getQuery(List<String> studies, List<String> files, MultivaluedMap<String, String> queryParameters) {
+    public QueryOptions getQuery(MultivaluedMap<String, String> queryParameters) {
         QueryOptions query = new QueryOptions();
         query.put(VariantDBAdaptor.FILES, files);
         query.put(VariantDBAdaptor.STUDIES, studies);
@@ -87,7 +81,7 @@ public class VariantExporterController {
     }
 
     public List<String> run() throws URISyntaxException, IOException {
-        return new VariantExporter(cellBaseClient).VcfHtsExport(iterator, outputDir, variantSourceDBAdaptor, query);
+        return new VariantExporter(cellBaseClient, variantDBAdaptor, query).vcfExport(outputDir, variantSourceDBAdaptor);
     }
 
 }

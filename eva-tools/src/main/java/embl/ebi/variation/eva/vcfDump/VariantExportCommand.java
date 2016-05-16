@@ -13,7 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package embl.ebi.variation.eva.vcfDump;
+package embl.ebi.variation.eva.vcfdump;
 
 import com.beust.jcommander.IValueValidator;
 import com.beust.jcommander.Parameter;
