@@ -1,5 +1,5 @@
 /*
- * Copyright 2015 EMBL - European Bioinformatics Institute
+ * Copyright 2015-2016 EMBL - European Bioinformatics Institute
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -15,8 +15,7 @@
  */
 package embl.ebi.variation.eva.pipeline.jobs;
 
-import embl.ebi.variation.eva.pipeline.steps.VariantsStatsCreate;
-import embl.ebi.variation.eva.pipeline.steps.VariantsStatsLoad;
+import embl.ebi.variation.eva.pipeline.steps.*;
 import org.junit.AfterClass;
 import org.junit.BeforeClass;
 import org.junit.Test;
@@ -93,6 +92,8 @@ public class VariantStatsConfigurationTest {
                 .addString("fileId", source.getFileId())
                 .addString("opencga.app.home", opencgaHome)
                 .addString(VariantsStatsLoad.SKIP_STATS_LOAD, "true")
+                .addString(VariantsAnnotGenerateInput.SKIP_ANNOT_GENERATE_INPUT, "true")
+                .addString(VariantsAnnotCreate.SKIP_ANNOT_CREATE, "true")
                 .toJobParameters();
 
         JobExecution execution = jobLauncher.run(job, parameters);
@@ -126,6 +127,8 @@ public class VariantStatsConfigurationTest {
                 .addString("fileId", source.getFileId())
                 .addString("opencga.app.home", opencgaHome)
                 .addString(VariantsStatsCreate.SKIP_STATS_CREATE, "true")
+                .addString(VariantsAnnotGenerateInput.SKIP_ANNOT_GENERATE_INPUT, "true")
+                .addString(VariantsAnnotCreate.SKIP_ANNOT_CREATE, "true")
                 .toJobParameters();
 
         JobExecution execution = jobLauncher.run(job, jobParameters);
@@ -165,6 +168,9 @@ public class VariantStatsConfigurationTest {
                 .addString("fileId", source.getFileId())
                 .addString("opencga.app.home", opencgaHome)
                 .addString(VariantsStatsCreate.SKIP_STATS_CREATE, "true")
+                .addString(VariantsAnnotGenerateInput.SKIP_ANNOT_GENERATE_INPUT, "true")
+                .addString(VariantsAnnotCreate.SKIP_ANNOT_CREATE, "true")
+                .addString(VariantsAnnotLoad.SKIP_ANNOT_LOAD, "true")
                 .toJobParameters();
 
         JobExecution execution = jobLauncher.run(job, parameters);

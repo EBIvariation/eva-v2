@@ -1,5 +1,5 @@
 /*
- * Copyright 2015 EMBL - European Bioinformatics Institute
+ * Copyright 2015-2016 EMBL - European Bioinformatics Institute
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -15,17 +15,11 @@
  */
 package embl.ebi.variation.eva.pipeline.jobs;
 
-import com.mongodb.DB;
-import com.mongodb.MongoClient;
-import embl.ebi.variation.eva.pipeline.steps.VariantsLoad;
-import embl.ebi.variation.eva.pipeline.steps.VariantsStatsCreate;
-import embl.ebi.variation.eva.pipeline.steps.VariantsStatsLoad;
+import embl.ebi.variation.eva.pipeline.steps.*;
 import org.junit.AfterClass;
 import org.junit.BeforeClass;
 import org.junit.Test;
 import org.junit.runner.RunWith;
-import org.opencb.biodata.models.variant.Variant;
-import org.opencb.biodata.models.variant.VariantSource;
 import org.opencb.datastore.core.QueryOptions;
 import org.opencb.opencga.storage.core.StorageManagerException;
 import org.opencb.opencga.storage.core.StorageManagerFactory;
@@ -35,23 +29,14 @@ import org.opencb.opencga.storage.core.variant.adaptors.VariantDBIterator;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.batch.core.*;
-import org.springframework.batch.core.configuration.annotation.JobBuilderFactory;
 import org.springframework.batch.core.launch.JobLauncher;
-import org.springframework.batch.core.repository.JobExecutionAlreadyRunningException;
-import org.springframework.batch.core.repository.JobInstanceAlreadyCompleteException;
-import org.springframework.batch.core.repository.JobRestartException;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.test.context.ContextConfiguration;
 import org.springframework.test.context.junit4.SpringJUnit4ClassRunner;
 
 import java.io.*;
 import java.net.UnknownHostException;
-import java.nio.file.Path;
 import java.nio.file.Paths;
-import java.util.Arrays;
-import java.util.Iterator;
-import java.util.List;
 import java.util.zip.GZIPInputStream;
 
 import static embl.ebi.variation.eva.pipeline.jobs.JobTestUtils.*;
@@ -107,6 +92,9 @@ public class VariantLoadConfigurationTest {
                 .addString("opencga.app.home", opencgaHome)
                 .addString(VariantsStatsCreate.SKIP_STATS_CREATE, "true")
                 .addString(VariantsStatsLoad.SKIP_STATS_LOAD, "true")
+                .addString(VariantsAnnotGenerateInput.SKIP_ANNOT_GENERATE_INPUT, "true")
+                .addString(VariantsAnnotCreate.SKIP_ANNOT_CREATE, "true")
+                .addString(VariantsAnnotLoad.SKIP_ANNOT_LOAD, "true")
                 .toJobParameters();
 
         JobExecution execution = jobLauncher.run(job, parameters);
@@ -127,9 +115,6 @@ public class VariantLoadConfigurationTest {
         assertEquals(countRows(iterator), lines);
     }
 
-    /**
-     * This test has to fail because the opencgaHome is not set, so it will fail at loading the storage engine configuration.
-     */
     @Test
     public void invalidLoad() throws JobExecutionException {
         String input = VariantLoadConfigurationTest.class.getResource(FILE_20).getFile();
@@ -152,6 +137,9 @@ public class VariantLoadConfigurationTest {
                 .addString("opencga.app.home", null)
                 .addString(VariantsStatsCreate.SKIP_STATS_CREATE, "true")
                 .addString(VariantsStatsLoad.SKIP_STATS_LOAD, "true")
+                .addString(VariantsAnnotGenerateInput.SKIP_ANNOT_GENERATE_INPUT, "true")
+                .addString(VariantsAnnotCreate.SKIP_ANNOT_CREATE, "true")
+                .addString(VariantsAnnotLoad.SKIP_ANNOT_LOAD, "true")
                 .toJobParameters();
 
         System.out.println("parameters in load tests" + parameters.toString());

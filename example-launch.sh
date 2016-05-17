@@ -1,6 +1,6 @@
 java -jar eva-pipeline/target/eva-pipeline-0.1.jar \
  --spring.batch.job.names=variantJob \
- input=data/small.vcf \
+ input=/path/to/input.vcf \
  fileId=5 \
  aggregated=NONE \
  studyType=COLLECTION \
@@ -9,11 +9,20 @@ java -jar eva-pipeline/target/eva-pipeline-0.1.jar \
  outputDir= \
  pedigree= \
  dbName=batch \
- samples=sample1,sample2,sample3,sample4 \
  storageEngine=mongodb \
+ overwriteStats=true \
  compressGenotypes=true \
  compressExtension=.gz \
  includeSrc=FIRST_8_COLUMNS \
- skipLoad=false \
- opencga.app.home=/opt/opencga/
-
+ opencga.app.home=/path/to/opencga_folder \
+ vepInput=/path/to/variants_to_annotate.tsv.gz \
+ vepOutput=/path/to/variants_annotation.tsv.gz \
+ vepPath=/path/to/ensembl-tools-release-82/scripts/variant_effect_predictor/variant_effect_predictor.pl \
+ vepCacheDirectory=/path/to/vep/cache_folder \
+ vepCacheVersion=82 \
+ vepSpecies=homo_sapiens \
+ vepFasta=/path/to/human/sequence.fa \
+ vepNumForks=4 \
+ --logging.level.embl.ebi.variation.eva=DEBUG \
+ --logging.level.org.opencb.opencga=DEBUG \
+ --logging.level.org.springframework=INFO
