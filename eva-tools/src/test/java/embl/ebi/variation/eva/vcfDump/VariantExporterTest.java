@@ -30,6 +30,7 @@ import htsjdk.variant.vcf.VCFFileReader;
 import org.opencb.biodata.models.variant.*;
 import org.opencb.datastore.core.QueryOptions;
 import org.opencb.opencga.lib.common.Config;
+import org.opencb.opencga.storage.core.StorageManagerException;
 import org.opencb.opencga.storage.core.StorageManagerFactory;
 import org.opencb.opencga.storage.core.variant.VariantStorageManager;
 import org.opencb.opencga.storage.core.variant.adaptors.VariantDBAdaptor;
@@ -61,6 +62,9 @@ public class VariantExporterTest {
     @Rule
     public ExpectedException thrown = ExpectedException.none();
     private static CellbaseWSClient cellBaseClient;
+    private static VariantStorageManager variantStorageManager;
+    private static VariantDBAdaptor variantDBAdaptor;
+    private static VariantSourceDBAdaptor variantSourceDBAdaptor;
 
     /**
      * Clears and populates the Mongo collection used during the tests.
@@ -68,13 +72,16 @@ public class VariantExporterTest {
      * @throws java.lang.InterruptedException
      */
     @BeforeClass
-    public static void setUpClass() throws IOException, InterruptedException, URISyntaxException {
+    public static void setUpClass() throws IOException, InterruptedException, URISyntaxException, IllegalAccessException, ClassNotFoundException, InstantiationException, StorageManagerException {
         cleanDBs();
         fillDB();
 
         Config.setOpenCGAHome(System.getenv("OPENCGA_HOME") != null ? System.getenv("OPENCGA_HOME") : "/opt/opencga");
         cellBaseClient = new CellbaseWSClient("hsapiens");
         logger.info("using cellbase: " + cellBaseClient.getUrl() + " version " + cellBaseClient.getVersion());
+        variantStorageManager = StorageManagerFactory.getVariantStorageManager();
+        variantDBAdaptor = variantStorageManager.getDBAdaptor(DB_NAME, null);
+        variantSourceDBAdaptor = variantDBAdaptor.getVariantSourceDBAdaptor();
     }
 
     /**
@@ -87,13 +94,8 @@ public class VariantExporterTest {
         cleanDBs();
     }
 
-
     @Test
     public void testVcfHtsExport() throws Exception {
-        VariantStorageManager variantStorageManager = StorageManagerFactory.getVariantStorageManager();
-        VariantDBAdaptor variantDBAdaptor = variantStorageManager.getDBAdaptor(DB_NAME, null);
-        VariantSourceDBAdaptor variantSourceDBAdaptor = variantDBAdaptor.getVariantSourceDBAdaptor();
-
         List<String> files = Arrays.asList("5", "6");
         List<String> studies = Collections.singletonList("7");
         QueryOptions query = getQuery(files, studies);
@@ -108,7 +110,6 @@ public class VariantExporterTest {
         VariantDBIterator iterator = variantDBAdaptor.iterator(query);
         assertEqualLinesFilesAndDB(outputFiles, iterator);
 
-
         for (String outputFile : outputFiles) {
             assertVcfOrderedByCoordinate(outputFile);
             boolean delete = new File(outputFile).delete();
@@ -122,11 +123,6 @@ public class VariantExporterTest {
         List<String> studies = Arrays.asList("7", "8");
         QueryOptions query = getQuery(files, studies);
         String outputDir = "/tmp/";
-
-
-        VariantStorageManager variantStorageManager = StorageManagerFactory.getVariantStorageManager();
-        VariantDBAdaptor variantDBAdaptor = variantStorageManager.getDBAdaptor(DB_NAME, null);
-        VariantSourceDBAdaptor variantSourceDBAdaptor = variantDBAdaptor.getVariantSourceDBAdaptor();
 
         VariantExporter variantExporter = new VariantExporter(cellBaseClient, variantDBAdaptor, query);
         List<String> outputFiles = variantExporter.vcfExport(outputDir, variantSourceDBAdaptor);
@@ -146,7 +142,6 @@ public class VariantExporterTest {
         iterator = variantDBAdaptor.iterator(query);
         assertEquals(countRows(iterator), countLines(outputFiles.get(1)));
 
-
         for (String outputFile : outputFiles) {
             assertVcfOrderedByCoordinate(outputFile);
             boolean delete = new File(outputFile).delete();
@@ -164,11 +159,6 @@ public class VariantExporterTest {
         // tell all variables to filter with
         query.put(VariantDBAdaptor.REGION, "20:61000-69000");
         query.put(VariantDBAdaptor.REFERENCE, "A");
-//        query.put(VariantDBAdaptor., "A");
-
-        VariantStorageManager variantStorageManager = StorageManagerFactory.getVariantStorageManager();
-        VariantDBAdaptor variantDBAdaptor = variantStorageManager.getDBAdaptor(DB_NAME, null);
-        VariantSourceDBAdaptor variantSourceDBAdaptor = variantDBAdaptor.getVariantSourceDBAdaptor();
 
         VariantExporter variantExporter = new VariantExporter(cellBaseClient, variantDBAdaptor, query);
         List<String> outputFiles = variantExporter.vcfExport(outputDir, variantSourceDBAdaptor);
@@ -198,10 +188,6 @@ public class VariantExporterTest {
         // tell all variables to filter with
         query.put(VariantDBAdaptor.REGION, "20:61000-66000,20:63000-69000");
 
-        VariantStorageManager variantStorageManager = StorageManagerFactory.getVariantStorageManager();
-        VariantDBAdaptor variantDBAdaptor = variantStorageManager.getDBAdaptor(DB_NAME, null);
-        VariantSourceDBAdaptor variantSourceDBAdaptor = variantDBAdaptor.getVariantSourceDBAdaptor();
-
         VariantExporter variantExporter = new VariantExporter(cellBaseClient, variantDBAdaptor, query);
         List<String> outputFiles = variantExporter.vcfExport(outputDir, variantSourceDBAdaptor);
 
@@ -226,11 +212,6 @@ public class VariantExporterTest {
         List<String> studies = Arrays.asList("7", "9"); // study 9 doesn't exist
         QueryOptions query = getQuery(files, studies);
         String outputDir = "/tmp/";
-
-        VariantStorageManager variantStorageManager = StorageManagerFactory.getVariantStorageManager();
-        VariantDBAdaptor variantDBAdaptor = variantStorageManager.getDBAdaptor(DB_NAME, null);
-        //VariantDBIterator iterator = variantDBAdaptor.iterator(query);
-        VariantSourceDBAdaptor variantSourceDBAdaptor = variantDBAdaptor.getVariantSourceDBAdaptor();
 
         VariantExporter variantExporter = new VariantExporter(cellBaseClient, variantDBAdaptor, query);
 
