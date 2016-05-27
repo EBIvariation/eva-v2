@@ -21,12 +21,13 @@ import embl.ebi.variation.eva.vcfdump.cellbasewsclient.CellbaseWSClient;
 import htsjdk.variant.variantcontext.Allele;
 import htsjdk.variant.variantcontext.Genotype;
 import htsjdk.variant.variantcontext.VariantContext;
+import htsjdk.variant.vcf.VCFHeader;
 import org.junit.AfterClass;
 import org.junit.BeforeClass;
 import org.junit.Rule;
 import org.junit.Test;
 import org.junit.rules.ExpectedException;
-import htsjdk.variant.vcf.VCFFileReader;
+import org.opencb.biodata.models.feature.Region;
 import org.opencb.biodata.models.variant.*;
 import org.opencb.datastore.core.QueryOptions;
 import org.opencb.opencga.lib.common.Config;
@@ -43,10 +44,8 @@ import java.io.*;
 import java.net.URISyntaxException;
 import java.net.UnknownHostException;
 import java.util.*;
-import java.util.zip.GZIPInputStream;
 
 import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
 
 /**
@@ -68,6 +67,7 @@ public class VariantExporterTest {
 
     /**
      * Clears and populates the Mongo collection used during the tests.
+     *
      * @throws java.io.IOException
      * @throws java.lang.InterruptedException
      */
@@ -95,160 +95,198 @@ public class VariantExporterTest {
     }
 
     @Test
-    public void testVcfHtsExport() throws Exception {
-        List<String> files = Arrays.asList("5", "6");
+    public void getSources() {
+        VariantExporter variantExporter = new VariantExporter(null, null, new QueryOptions());
+
+        // one study
+        String study7Id = "7";
+        List<String> studies = Collections.singletonList(study7Id);
+        Map<String, VariantSource> sources = variantExporter.getSources(variantSourceDBAdaptor, studies);
+        assertEquals(1, sources.size());
+        VariantSource file = sources.get(study7Id);
+        assertEquals(study7Id, file.getStudyId());
+        assertEquals("6", file.getFileId());
+
+        // two studies
+        String study8Id = "8";
+        studies = Arrays.asList(study7Id, study8Id);
+        sources = variantExporter.getSources(variantSourceDBAdaptor, studies);
+        assertEquals(2, sources.size());
+        file = sources.get(study7Id);
+        assertEquals(study7Id, file.getStudyId());
+        assertEquals("6", file.getFileId());
+        assertEquals(2504, file.getSamples().size());
+        file = sources.get(study8Id);
+        assertEquals(study8Id, file.getStudyId());
+        assertEquals("5", file.getFileId());
+        assertEquals(2504, file.getSamples().size());
+
+        // one study not in database
+        studies = Arrays.asList("2");
+        sources = variantExporter.getSources(variantSourceDBAdaptor, studies);
+        assertEquals(0, sources.size());
+
+        // empty study filter
+        studies = new ArrayList<>();
+        sources = variantExporter.getSources(variantSourceDBAdaptor, studies);
+        assertEquals(0, sources.size());
+    }
+
+    @Test
+    public void getVcfHeaders() throws IOException {
+        VariantExporter variantExporter = new VariantExporter(null, null, new QueryOptions());
+        String study7Id = "7";
+        String study8Id = "8";
+        List<String> studies = Arrays.asList(study7Id, study8Id);
+        Map<String, VariantSource> sources = variantExporter.getSources(variantSourceDBAdaptor, studies);
+
+        Map<String, VCFHeader> headers = variantExporter.getVcfHeaders(sources);
+        VCFHeader header = headers.get(study7Id);
+        assertEquals(2504, header.getSampleNamesInOrder().size());
+        assertTrue(header.hasGenotypingData());
+        header = headers.get(study8Id);
+        assertEquals(2504, header.getSampleNamesInOrder().size());
+        assertTrue(header.hasGenotypingData());
+    }
+
+    @Test
+    public void testExportOneStudy() throws Exception {
         List<String> studies = Collections.singletonList("7");
-        QueryOptions query = getQuery(files, studies);
-        VariantExporter variantExporter = new VariantExporter(cellBaseClient, variantDBAdaptor, query);
-        String outputDir = "/tmp/";
-        List<String> outputFiles = variantExporter.vcfExport(outputDir, variantSourceDBAdaptor);
-
-        ////// checks
-        assertEquals(studies.size(), outputFiles.size());
-        assertEquals(0, variantExporter.getFailedVariants());   // test file should not have failed variants
-
-        VariantDBIterator iterator = variantDBAdaptor.iterator(query);
-        assertEqualLinesFilesAndDB(outputFiles, iterator);
-
-        for (String outputFile : outputFiles) {
-            assertVcfOrderedByCoordinate(outputFile);
-            boolean delete = new File(outputFile).delete();
-            assertTrue(delete);
-        }
+        String region = "20:61000-69000";
+        QueryOptions query = new QueryOptions();
+        Map<String, List<VariantContext>> exportedVariants = exportAndCheck(query, studies, region);
+        checkExportedVariants(query, studies, exportedVariants);
     }
 
     @Test
-    public void testVcfHtsExportSeveralStudies() throws Exception {
-        List<String> files = Arrays.asList("5", "6");
+    public void testExportTwoStudies() throws Exception {
         List<String> studies = Arrays.asList("7", "8");
-        QueryOptions query = getQuery(files, studies);
-        String outputDir = "/tmp/";
-
-        VariantExporter variantExporter = new VariantExporter(cellBaseClient, variantDBAdaptor, query);
-        List<String> outputFiles = variantExporter.vcfExport(outputDir, variantSourceDBAdaptor);
-
-        ////////// checks
-
-        assertEquals(studies.size(), outputFiles.size());
-        assertEquals(0, variantExporter.getFailedVariants());
-
-        // for study 7
-        query.put(VariantDBAdaptor.STUDIES, Collections.singletonList("7"));
-        VariantDBIterator iterator = variantDBAdaptor.iterator(query);
-        assertEquals(countRows(iterator), countLines(outputFiles.get(0)));
-
-        // for study 8
-        query.put(VariantDBAdaptor.STUDIES, Collections.singletonList("8"));
-        iterator = variantDBAdaptor.iterator(query);
-        assertEquals(countRows(iterator), countLines(outputFiles.get(1)));
-
-        for (String outputFile : outputFiles) {
-            assertVcfOrderedByCoordinate(outputFile);
-            boolean delete = new File(outputFile).delete();
-            assertTrue(delete);
-        }
+        String region = "20:61000-69000";
+        // TODO Both studies have 219 variants in the region... check if we can choose some region with different number of variants
+        QueryOptions query = new QueryOptions();
+        Map<String, List<VariantContext>> exportedVariants = exportAndCheck(query, studies, region);
+        checkExportedVariants(query, studies, exportedVariants);
     }
 
-    @Test
-    public void testFilter() throws Exception {
-        List<String> files = Arrays.asList("5");
-        List<String> studies = Arrays.asList("7");
-        QueryOptions query = getQuery(files, studies);
-        String outputDir = "/tmp/";
+//    @Test
+//    public void textExportWithFilter() {
+//        QueryOptions queryOptions = new QueryOptions();
+//        // TODO: this test should fail, is not exporting all variants
+//        queryOptions.put(VariantDBAdaptor.ID, "rs544625796");
+//        List<String> studies = Collections.singletonList("7");
+//        String region = "20:61000-69000";
+//        eMap<String, List<VariantContext>> exportedVariants = xportAndCheck(queryOptions, studies, region);
+//        checkExportedVariants
+//                // annot-ct=SO%3A0001583
+//
+//    }
+//    @Test
+//    public void testFilter() throws Exception {
+//        List<String> files = Arrays.asList("5");
+//        List<String> studies = Arrays.asList("7");
+//        QueryOptions query = getQuery(files, studies);
+//        String outputDir = "/tmp/";
+//
+//        // tell all variables to filter with
+//        query.put(VariantDBAdaptor.REGION, "20:61000-69000");
+//        query.put(VariantDBAdaptor.REFERENCE, "A");
+//
+//        VariantExporter variantExporter = new VariantExporter(cellBaseClient, variantDBAdaptor, query);
+//        List<String> outputFiles = variantExporter.vcfExport(outputDir, variantSourceDBAdaptor);
+//
+//        ////////// checks
+//
+//        assertEquals(studies.size(), outputFiles.size());
+//        assertEquals(0, variantExporter.getFailedVariants());   // test file should not have failed variants
+//
+//        VariantDBIterator iterator = variantDBAdaptor.iterator(query);
+//        assertEqualLinesFilesAndDB(outputFiles, iterator);
+//
+//        for (String outputFile : outputFiles) {
+//            assertVcfOrderedByCoordinate(outputFile);
+//            boolean delete = new File(outputFile).delete();
+//            assertTrue(delete);
+//        }
+//    }
 
-        // tell all variables to filter with
-        query.put(VariantDBAdaptor.REGION, "20:61000-69000");
-        query.put(VariantDBAdaptor.REFERENCE, "A");
+    // TODO: move logic of check sources to controller or to method get sources
+//    @Test
+//    public void testMissingStudy() throws Exception {
+//        List<String> studies = Arrays.asList("7", "9"); // study 9 doesn't exist
+//        String region = "20:61000-69000";
+//        QueryOptions query = new QueryOptions();
+//        Map<String, List<VariantContext>> exportedVariants = exportAndCheck(query, studies, region);
+//        // TODO: should fail?
+//        //        thrown.expect(IllegalArgumentException.class);  // comment this line to see the actual exception, making the test fail
+//        checkExportedVariants(query, Collections.singletonList("7"), exportedVariants);
+//    }
+//
+//    @Test
+//    public void testMissingStudy() throws Exception {
+//        List<String> studies = Arrays.asList("7", "9"); // study 9 doesn't exist
+//        QueryOptions query = new QueryOptions();
+//        query.add(VariantDBAdaptor.STUDIES, studies);
+//        String outputDir = "/tmp/";
+//
+//        VariantExporter variantExporter = new VariantExporter(cellBaseClient, variantDBAdaptor, query);
+//
+//        thrown.expect(IllegalArgumentException.class);  // comment this line to see the actual exception, making the test fail
+//        variantExporter.vcfExport(outputDir, variantSourceDBAdaptor);
+//    }
 
-        VariantExporter variantExporter = new VariantExporter(cellBaseClient, variantDBAdaptor, query);
-        List<String> outputFiles = variantExporter.vcfExport(outputDir, variantSourceDBAdaptor);
 
-        ////////// checks
+//
+//    @Test
+//    public void testFilter() throws Exception {
+//        List<String> files = Arrays.asList("5");
+//        List<String> studies = Arrays.asList("7");
+//        QueryOptions query = getQuery(files, studies);
+//        String outputDir = "/tmp/";
+//
+//        // tell all variables to filter with
+//        query.put(VariantDBAdaptor.REGION, "20:61000-69000");
+//        query.put(VariantDBAdaptor.REFERENCE, "A");
+//
+//        VariantExporter variantExporter = new VariantExporter(cellBaseClient, variantDBAdaptor, query);
+//        List<String> outputFiles = variantExporter.vcfExport(outputDir, variantSourceDBAdaptor);
+//
+//        ////////// checks
+//
+//        assertEquals(studies.size(), outputFiles.size());
+//        assertEquals(0, variantExporter.getFailedVariants());   // test file should not have failed variants
+//
+//        VariantDBIterator iterator = variantDBAdaptor.iterator(query);
+//        assertEqualLinesFilesAndDB(outputFiles, iterator);
+//
+//        for (String outputFile : outputFiles) {
+//            assertVcfOrderedByCoordinate(outputFile);
+//            boolean delete = new File(outputFile).delete();
+//            assertTrue(delete);
+//        }
+//    }
 
-        assertEquals(studies.size(), outputFiles.size());
-        assertEquals(0, variantExporter.getFailedVariants());   // test file should not have failed variants
-
-        VariantDBIterator iterator = variantDBAdaptor.iterator(query);
-        assertEqualLinesFilesAndDB(outputFiles, iterator);
-
-        for (String outputFile : outputFiles) {
-            assertVcfOrderedByCoordinate(outputFile);
-            boolean delete = new File(outputFile).delete();
-            assertTrue(delete);
-        }
-    }
-
-    @Test
-    public void testFilterUsingIntersectingRegions() throws Exception {
-        List<String> files = Arrays.asList("5");
-        List<String> studies = Arrays.asList("7");
-        QueryOptions query = getQuery(files, studies);
-        String outputDir = "/tmp/";
-
-        // tell all variables to filter with
-        query.put(VariantDBAdaptor.REGION, "20:61000-66000,20:63000-69000");
-
-        VariantExporter variantExporter = new VariantExporter(cellBaseClient, variantDBAdaptor, query);
-        List<String> outputFiles = variantExporter.vcfExport(outputDir, variantSourceDBAdaptor);
-
-        ////////// checks
-
-        assertEquals(studies.size(), outputFiles.size());
-        assertEquals(0, variantExporter.getFailedVariants());   // test file should not have failed variants
-
-        VariantDBIterator iterator = variantDBAdaptor.iterator(query);
-        assertEqualLinesFilesAndDB(outputFiles, iterator);
-
-        for (String outputFile : outputFiles) {
-            assertVcfOrderedByCoordinate(outputFile);
-            boolean delete = new File(outputFile).delete();
-            assertTrue(delete);
-        }
-    }
-
-    @Test
-    public void testMissingStudy() throws Exception {
-        List<String> files = Arrays.asList("5");
-        List<String> studies = Arrays.asList("7", "9"); // study 9 doesn't exist
-        QueryOptions query = getQuery(files, studies);
-        String outputDir = "/tmp/";
-
-        VariantExporter variantExporter = new VariantExporter(cellBaseClient, variantDBAdaptor, query);
-
-        thrown.expect(IllegalArgumentException.class);  // comment this line to see the actual exception, making the test fail
-        variantExporter.vcfExport(outputDir, variantSourceDBAdaptor);
-    }
 
     @Test
     public void testMissingCellbase() throws Exception {
-        final VariantSource variantSource = new VariantSource("name", "fileId", "studyId", "studyName");
-        List<String> samples = new ArrayList<>();
-        for (int i = 0; i < 6; i++) {
-            samples.add("s"+i);
-        }
-        variantSource.setSamples(samples);
-        VariantFactory factory = new VariantVcfFactory();
-        Map<String, VariantSource> sources = Collections.singletonMap(variantSource.getStudyId(), variantSource);
-        QueryOptions options = new QueryOptions("fileId", "fileId");
         String studyId = "studyId";
-        options.add("studyId", studyId);
-        List<Variant> variants;
-        Map<String, VariantContext> variantContext;
-        List<String> alleles;
+        final VariantSource variantSource = createTestVariantSource(studyId);
+        VariantFactory factory = new VariantVcfFactory();
+
+        List<String> studies = Collections.singletonList(studyId);
 
         // test multiallelic. these first conversions should NOT fail, as they doesn't need the src
         String multiallelicLine = "1\t1000\tid\tC\tA,T\t100\tPASS\t.\tGT\t0|0\t0|0\t0|1\t1|1\t1|2\t0|1";
-        variants = factory.create(variantSource, multiallelicLine);
+        List<Variant> variants = factory.create(variantSource, multiallelicLine);
         assertEquals(2, variants.size());
         removeSrc(variants);    // <---- this is the key point of the test
 
         VariantExporter variantExporter = new VariantExporter(null, null, null);
-        variantContext = variantExporter.convertBiodataVariantToVariantContext(variants.get(0), sources, null);
+        Map<String, VariantContext> variantContext = variantExporter.convertBiodataVariantToVariantContext(variants.get(0), studies, null);
 
-        alleles = Arrays.asList("C", "A", ".");
+        List<String> alleles = Arrays.asList("C", "A", ".");
         assertEqualGenotypes(variants.get(0), variantContext.get(studyId), alleles);
 
-        variantContext = variantExporter.convertBiodataVariantToVariantContext(variants.get(1), sources, null);
+        variantContext = variantExporter.convertBiodataVariantToVariantContext(variants.get(1), studies, null);
         alleles = Arrays.asList("C", "T", ".");
         assertEqualGenotypes(variants.get(1), variantContext.get(studyId), alleles);
 
@@ -259,45 +297,36 @@ public class VariantExporterTest {
         assertEquals(2, variants.size());
         removeSrc(variants);    // <---- this is the key point of the test
 
-        variantContext = variantExporter.convertBiodataVariantToVariantContext(variants.get(1), sources, null);
+        variantContext = variantExporter.convertBiodataVariantToVariantContext(variants.get(1), studies, null);
         alleles = Arrays.asList("C", "T", ".");
         assertEqualGenotypes(variants.get(1), variantContext.get(studyId), alleles);
 
-        // the next conversion is the only one that should throw
+        // the next exception is the only one that should throw
         thrown.expect(IllegalArgumentException.class);
-        variantExporter.convertBiodataVariantToVariantContext(variants.get(0), sources, null);
+        variantExporter.convertBiodataVariantToVariantContext(variants.get(0), studies, null);
 
     }
 
     @Test
     public void testGetVariantContextFromVariant() throws Exception {
-        final VariantSource variantSource = new VariantSource("name", "fileId", "studyId", "studyName");
-        List<String> samples = new ArrayList<>();
-        for (int i = 0; i < 6; i++) {
-            samples.add("s" + i);
-        }
-        variantSource.setSamples(samples);
-        VariantFactory factory = new VariantVcfFactory();
-        Map<String, VariantSource> sources = Collections.singletonMap(variantSource.getStudyId(), variantSource);
-        QueryOptions options = new QueryOptions("fileId", "fileId");
         String studyId = "studyId";
-        options.add("studyId", studyId);
-        List<Variant> variants;
-        Map<String, VariantContext> variantContext;
-        List<String> alleles;
+        final VariantSource variantSource = createTestVariantSource(studyId);
+        VariantFactory factory = new VariantVcfFactory();
+
+        List<String> studyIds = Collections.singletonList(studyId);
 
         // test multiallelic
         String multiallelicLine = "1\t1000\tid\tC\tA,T\t100\tPASS\t.\tGT\t0|0\t0|0\t0|1\t1|1\t1|2\t0|1";
-        variants = factory.create(variantSource, multiallelicLine);
+        List<Variant> variants = factory.create(variantSource, multiallelicLine);
         assertEquals(2, variants.size());
 
         VariantExporter variantExporter = new VariantExporter(cellBaseClient, null, null);
-        variantContext = variantExporter.convertBiodataVariantToVariantContext(variants.get(0), sources, null);
+        Map<String, VariantContext> variantContext = variantExporter.convertBiodataVariantToVariantContext(variants.get(0), studyIds, null);
 
-        alleles = Arrays.asList("C", "A", ".");
+        List<String> alleles = Arrays.asList("C", "A", ".");
         assertEqualGenotypes(variants.get(0), variantContext.get(studyId), alleles);
 
-        variantContext = variantExporter.convertBiodataVariantToVariantContext(variants.get(1), sources, null);
+        variantContext = variantExporter.convertBiodataVariantToVariantContext(variants.get(1), studyIds, null);
         alleles = Arrays.asList("C", "T", ".");
         assertEqualGenotypes(variants.get(1), variantContext.get(studyId), alleles);
 
@@ -306,7 +335,7 @@ public class VariantExporterTest {
         String indelLine = "1\t1000\tid\tN\tNA\t100\tPASS\t.\tGT\t0|0\t0|0\t0|1\t1|1\t1|0\t0|1";
         variants = factory.create(variantSource, indelLine);
 
-        variantContext = variantExporter.convertBiodataVariantToVariantContext(variants.get(0), sources, null);
+        variantContext = variantExporter.convertBiodataVariantToVariantContext(variants.get(0), studyIds, null);
         alleles = Arrays.asList("N", "NA");
         assertEqualGenotypes(variants.get(0), variantContext.get(studyId), alleles);
 
@@ -316,14 +345,60 @@ public class VariantExporterTest {
         variants = factory.create(variantSource, multiallelicIndelLine);
         assertEquals(2, variants.size());
 
-        variantContext = variantExporter.convertBiodataVariantToVariantContext(variants.get(0), sources, null);
+        variantContext = variantExporter.convertBiodataVariantToVariantContext(variants.get(0), studyIds, null);
         alleles = Arrays.asList("N", "NA", ".");
         assertEqualGenotypes(variants.get(0), variantContext.get(studyId), alleles);
 
-        variantContext = variantExporter.convertBiodataVariantToVariantContext(variants.get(1), sources, null);
+        variantContext = variantExporter.convertBiodataVariantToVariantContext(variants.get(1), studyIds, null);
         alleles = Arrays.asList("N", "T", ".");
         assertEqualGenotypes(variants.get(1), variantContext.get(studyId), alleles);
 
+    }
+
+
+    private Map<String, List<VariantContext>> exportAndCheck(QueryOptions query, List<String> studies, String region) {
+        VariantExporter variantExporter = new VariantExporter(cellBaseClient, null, null);
+        query.put(VariantDBAdaptor.STUDIES, studies);
+        query.add(VariantDBAdaptor.REGION, region);
+
+        VariantDBIterator iterator = variantDBAdaptor.iterator(query);
+        Map<String, List<VariantContext>> exportedVariants = variantExporter.export(iterator, new Region(region), studies);
+        assertEquals(0, variantExporter.getFailedVariants());
+        return exportedVariants;
+    }
+
+    private void checkExportedVariants(QueryOptions query, List<String> studies, Map<String, List<VariantContext>> exportedVariants) {
+        // checks
+        assertEquals(studies.size(), exportedVariants.keySet().size());
+
+        for (String study : studies) {
+            compareExportedVariantsWithDatabaseOnes(query, exportedVariants, study);
+        }
+    }
+
+    private void compareExportedVariantsWithDatabaseOnes(QueryOptions query, Map<String, List<VariantContext>> exportedVariants, String study) {
+        VariantDBIterator iterator;
+        query.put(VariantDBAdaptor.STUDIES, Collections.singletonList(study));
+        long iteratorSize = 0;
+        iterator = variantDBAdaptor.iterator(query);
+        while (iterator.hasNext()) {
+            Variant variant = iterator.next();
+            assertTrue(variantInExportedVariantsCollection(variant, exportedVariants.get(study)));
+            iteratorSize++;
+        }
+        int studyExportedVariants = exportedVariants.get(study).size();
+        logger.info("{} variants exported for study {}", studyExportedVariants, study);
+        assertEquals(iteratorSize, studyExportedVariants);
+    }
+
+    private VariantSource createTestVariantSource(String studyId) {
+        final VariantSource variantSource = new VariantSource("name", "fileId", studyId, "studyName");
+        List<String> samples = new ArrayList<>();
+        for (int i = 0; i < 6; i++) {
+            samples.add("s"+i);
+        }
+        variantSource.setSamples(samples);
+        return variantSource;
     }
 
     private static void cleanDBs() throws UnknownHostException {
@@ -364,64 +439,64 @@ public class VariantExporterTest {
             }
         }
     }
-
-    private void assertEqualLinesFilesAndDB(List<String> fileNames, VariantDBIterator iterator) throws IOException {
-        long lines = 0;
-        for (String fileName : fileNames) {
-            lines += countLines(fileName);
-        }
-
-        // counting variants in the DB
-        long variantRows = countRows(iterator);
-
-        assertEquals(variantRows, lines);
-    }
-
-    private long countRows(Iterator<Variant> iterator) {
-        int variantRows = 0;
-        while(iterator.hasNext()) {
-            iterator.next();
-            variantRows++;
-        }
-        return variantRows;
-    }
-
-    private long countLines(String fileName) throws IOException {
-        long lines;
-        lines = 0;
-        BufferedReader file = new BufferedReader(new InputStreamReader(new GZIPInputStream(new FileInputStream(fileName))));
-        String line;
-        while ((line = file.readLine()) != null) {
-            if (line.charAt(0) != '#') {
-                lines++;
-            }
-        }
-        file.close();
-        return lines;
-    }
-
-    private void assertVcfOrderedByCoordinate(String fileName) {
-        logger.info("Checking that {} is sorted by coordinate", fileName);
-        Set<String> finishedContigs = new HashSet<>();
-        VCFFileReader vcfReader = new VCFFileReader(new File(fileName), false);
-        String lastContig = null;
-        int previousStart = -1;
-        
-        for (VariantContext variant : vcfReader) {
-            // check chromosome
-            if (lastContig == null || !variant.getContig().equals(lastContig)) {
-                if (lastContig != null) {
-                    finishedContigs.add(lastContig);
-                }
-                lastContig = variant.getContig();
-                assertFalse("The variants should by grouped by contig in the vcf output", finishedContigs.contains(lastContig));
-                previousStart = -1;
-            }
-            assertTrue("The vcf is not sorted by coordinate: " + variant, variant.getStart() >= previousStart);
-            previousStart = variant.getStart();
-        }
-
-    }
+//
+//    private void assertEqualLinesFilesAndDB(List<String> fileNames, VariantDBIterator iterator) throws IOException {
+//        long lines = 0;
+//        for (String fileName : fileNames) {
+//            lines += countLines(fileName);
+//        }
+//
+//        // counting variants in the DB
+//        long variantRows = countRows(iterator);
+//
+//        assertEquals(variantRows, lines);
+//    }
+//
+//    private long countRows(Iterator<Variant> iterator) {
+//        int variantRows = 0;
+//        while(iterator.hasNext()) {
+//            iterator.next();
+//            variantRows++;
+//        }
+//        return variantRows;
+//    }
+//
+//    private long countLines(String fileName) throws IOException {
+//        long lines;
+//        lines = 0;
+//        BufferedReader file = new BufferedReader(new InputStreamReader(new GZIPInputStream(new FileInputStream(fileName))));
+//        String line;
+//        while ((line = file.readLine()) != null) {
+//            if (line.charAt(0) != '#') {
+//                lines++;
+//            }
+//        }
+//        file.close();
+//        return lines;
+//    }
+//
+//    private void assertVcfOrderedByCoordinate(String fileName) {
+//        logger.info("Checking that {} is sorted by coordinate", fileName);
+//        Set<String> finishedContigs = new HashSet<>();
+//        VCFFileReader vcfReader = new VCFFileReader(new File(fileName), false);
+//        String lastContig = null;
+//        int previousStart = -1;
+//
+//        for (VariantContext variant : vcfReader) {
+//            // check chromosome
+//            if (lastContig == null || !variant.getContig().equals(lastContig)) {
+//                if (lastContig != null) {
+//                    finishedContigs.add(lastContig);
+//                }
+//                lastContig = variant.getContig();
+//                assertFalse("The variants should by grouped by contig in the vcf output", finishedContigs.contains(lastContig));
+//                previousStart = -1;
+//            }
+//            assertTrue("The vcf is not sorted by coordinate: " + variant, variant.getStart() >= previousStart);
+//            previousStart = variant.getStart();
+//        }
+//
+//    }
 
     private void assertEqualGenotypes(Variant variant, VariantContext variantContext, List<String> alleles) {
         for (Map.Entry<String, Map<String, String>> data : variant.getSourceEntries().values().iterator().next().getSamplesData().entrySet()) {
@@ -434,12 +509,34 @@ public class VariantExporterTest {
                     genotype.getAllele(1));
         }
     }
+//
+//    private QueryOptions getQuery(List<String> studies) {
+//        QueryOptions query = new QueryOptions();
+//        query.put(VariantDBAdaptor.STUDIES, studies);
+//        return query;
+//    }
 
-    private QueryOptions getQuery(List<String> files, List<String> studies) {
-        QueryOptions query = new QueryOptions();
-        query.put(VariantDBAdaptor.FILES, files);
-        query.put(VariantDBAdaptor.STUDIES, studies);
-        return query;
+
+    private static boolean variantInExportedVariantsCollection(Variant variant, List<VariantContext> exportedVariants) {
+        if (exportedVariants.stream().anyMatch(v -> sameVariant(variant, v))) {
+            return true;
+        }
+
+        return false;
     }
 
+    private static boolean sameVariant(Variant v1, VariantContext v2) {
+        if (v2.getContig().equals(v1.getChromosome()) && v2.getStart() == v1.getStart()) {
+            if (v1.getReference().equals("")) {
+                // insertion
+                return v2.getAlternateAlleles().contains(Allele.create(v2.getReference().getBaseString() + v1.getAlternate()));
+            } else if (v1.getAlternate().equals("")) {
+                // deletion
+                return v2.getAlternateAlleles().stream().anyMatch(alt -> v2.getReference().getBaseString().equals(alt.getBaseString() + v1.getReference()));
+            } else {
+                return v1.getReference().equals(v2.getReference().getBaseString()) && v2.getAlternateAlleles().contains(Allele.create(v1.getAlternate()));
+            }
+        }
+        return false;
+    }
 }

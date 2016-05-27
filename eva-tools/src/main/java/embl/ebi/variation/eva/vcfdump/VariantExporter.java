@@ -112,11 +112,7 @@ public class VariantExporter {
         List<String> studyIds = options.getAsStringList(VariantDBAdaptor.STUDIES);
 
         // 1) retrieve the sources
-        Map<String, VariantSource> sources = new TreeMap<>();
-        List<VariantSource> sourcesList = sourceDBAdaptor.getAllSourcesByStudyIds(studyIds, options).getResult();
-        for (VariantSource variantSource : sourcesList) {
-            sources.put(variantSource.getStudyId(), variantSource);
-        }
+        Map<String, VariantSource> sources = getSources(sourceDBAdaptor, studyIds);
 
         // 2) check that sourceDBAdaptor got all the studyIds
         for (String studyId : studyIds) {
@@ -162,11 +158,11 @@ public class VariantExporter {
 
         Set<String> chromosomes = getChromosomes(headers, studyIds, options);
         if (chromosomes.isEmpty()) {
-            dumpVariants(sources, writers, options);
+            dumpVariants(studyIds, writers, options);
         } else {
             for (String chromosome : chromosomes) {
                 //dumpVariantsForChromosome(chromosome, sources, writers);
-                dumpVariantsForChromosomeUsingRegions(chromosome, sources, writers);
+                dumpVariantsForChromosomeUsingRegions(chromosome, studyIds, writers);
             }
         }
         logger.debug("Total time spent querying to database: {}", totalQuerying);
@@ -185,12 +181,43 @@ public class VariantExporter {
         return files;
     }
 
-    private void dumpVariantsForChromosomeUsingRegions(String chromosome, Map<String, VariantSource> sources, Map<String, VariantContextWriter> writers) throws IOException {
+    public Map<String, List<VariantContext>> export(VariantDBIterator iterator, Region region, List<String> studyIds) {
+        Map<String, List<VariantContext>> variantsToExportByStudy = new HashMap<>();
+        while (iterator.hasNext()) {
+            Variant variant = iterator.next();
+            if (region.contains(variant.getChromosome(), variant.getStart())) {
+                try {
+                    Map<String, VariantContext> variantContexts = convertBiodataVariantToVariantContext(variant, studyIds, region);
+                    for (Map.Entry<String, VariantContext> variantContext : variantContexts.entrySet()) {
+                        variantsToExportByStudy.putIfAbsent(variantContext.getKey(), new ArrayList<>());
+                        variantsToExportByStudy.get(variantContext.getKey()).add(variantContext.getValue());
+                    }
+                } catch (Exception e) {
+                    logger.warn("Variant {}:{}:{}>{} dump failed: {}", variant.getChromosome(), variant.getStart(), variant.getReference(),
+                            variant.getAlternate(), e.getMessage());
+                    failedVariants++;
+                    // TODO: get failed variants in the controller
+                }
+            }
+        }
+        return variantsToExportByStudy;
+    }
+
+    public Map<String, VariantSource> getSources(VariantSourceDBAdaptor sourceDBAdaptor, List<String> studyIds) {
+        Map<String, VariantSource> sources = new TreeMap<>();
+        List<VariantSource> sourcesList = sourceDBAdaptor.getAllSourcesByStudyIds(studyIds, options).getResult();
+        for (VariantSource variantSource : sourcesList) {
+            sources.put(variantSource.getStudyId(), variantSource);
+        }
+        return sources;
+    }
+
+    private void dumpVariantsForChromosomeUsingRegions(String chromosome, List<String> studyIds, Map<String, VariantContextWriter> writers) throws IOException {
         List<Region> allRegionsInChromosome = getRegionsForChromosome(chromosome, options);
         for (Region region : allRegionsInChromosome) {
             regionSequence = null;
             long start = System.currentTimeMillis();
-            Map<String, List<VariantContext>> variantsInRegion = dumpVariantsInRegion(region, sources);
+            Map<String, List<VariantContext>> variantsInRegion = dumpVariantsInRegion(region, studyIds);
             long queryFinished = System.currentTimeMillis();
 
             writeChunkToOutputFiles(variantsInRegion, writers);
@@ -291,7 +318,7 @@ public class VariantExporter {
     }
 
 
-    private Map<String, List<VariantContext>> dumpVariantsInRegion(Region region, Map<String, VariantSource> sources) throws IOException {
+    private Map<String, List<VariantContext>> dumpVariantsInRegion(Region region, List<String> studyIds) throws IOException {
         Map<String, List<VariantContext>> dumpedVariants = new HashMap<>();
         QueryOptions regionQuery = addRegionToQuery(region);
         regionQuery = addProjectionToQuery(regionQuery);
@@ -300,7 +327,7 @@ public class VariantExporter {
             Variant variant = variantDBIterator.next();
             if (region.contains(variant.getChromosome(), variant.getStart())) {
                 try {
-                    Map<String, VariantContext> variantContexts = convertBiodataVariantToVariantContext(variant, sources, region);
+                    Map<String, VariantContext> variantContexts = convertBiodataVariantToVariantContext(variant, studyIds, region);
                     for (Map.Entry<String, VariantContext> variantContext : variantContexts.entrySet()) {
                         dumpedVariants.putIfAbsent(variantContext.getKey(), new ArrayList<>());
                         dumpedVariants.get(variantContext.getKey()).add(variantContext.getValue());
@@ -348,13 +375,13 @@ public class VariantExporter {
         }
     }
 
-    private void dumpVariants(Map<String, VariantSource> sources, Map<String, VariantContextWriter> writers, QueryOptions query) {
+    private void dumpVariants(List<String> studyIds, Map<String, VariantContextWriter> writers, QueryOptions query) {
         query = addProjectionToQuery(query);
         VariantDBIterator variantDBIterator = variantDBAdaptor.iterator(query);
         while (variantDBIterator.hasNext()) {
             Variant variant = variantDBIterator.next();
             try {
-                Map<String, VariantContext> variantContexts = convertBiodataVariantToVariantContext(variant, sources, null);
+                Map<String, VariantContext> variantContexts = convertBiodataVariantToVariantContext(variant, studyIds, null);
                 for (Map.Entry<String, VariantContext> variantContextEntry : variantContexts.entrySet()) {
                     if (writers.containsKey(variantContextEntry.getKey())) {
                         writers.get(variantContextEntry.getKey()).add(variantContextEntry.getValue());
@@ -378,7 +405,7 @@ public class VariantExporter {
      * - returns one header per study (one header for each key in `sources`).
      * @throws IOException
      */
-    private Map<String, VCFHeader> getVcfHeaders(Map<String, VariantSource> sources) throws IOException {
+    public Map<String, VCFHeader> getVcfHeaders(Map<String, VariantSource> sources) throws IOException {
         Map<String, VCFHeader> headers = new TreeMap<>();
 
         for (VariantSource source : sources.values()) {
@@ -482,9 +509,8 @@ public class VariantExporter {
      * @return
      */
     public Map<String, VariantContext> convertBiodataVariantToVariantContext(
-            Variant variant, Map<String, VariantSource> sources, Region region) throws IOException {
+            Variant variant, List<String> studyIds, Region region) throws IOException {
         int missingGenotypes = 0;
-        Set<String> studyIds = sources.keySet();
         Map<String, VariantContext> variantContextMap = new TreeMap<>();
         VariantContextBuilder variantContextBuilder = new VariantContextBuilder();
 
@@ -493,6 +519,7 @@ public class VariantExporter {
         Integer start = variant.getStart();
         Integer end = start + reference.length() -1;
         String filter = "PASS";
+        // TODO: avoid creating a list per variant
         List<String> allelesArray = Arrays.asList(reference, alternate);
         Map<String, List<Genotype>> genotypesPerStudy = new TreeMap<>();
 
@@ -524,6 +551,7 @@ public class VariantExporter {
                     } else {
                         contextNucleotide = getContextNucleotideFromCellbase(variant, start, studyId);
                     }
+                    // TODO: maybe this can be more efficient
                     allelesArray.set(0, contextNucleotide + reference);
                     allelesArray.set(1, contextNucleotide + alternate);
                     end = start + allelesArray.get(0).length()-1;   // -1 because end is inclusive. [start, end] instead of [start, end)
