@@ -19,6 +19,7 @@ import org.junit.BeforeClass;
 import org.junit.Test;
 import org.opencb.biodata.models.feature.Region;
 
+import java.util.Arrays;
 import java.util.List;
 
 import static org.junit.Assert.*;
@@ -72,5 +73,16 @@ public class RegionDividerTest {
         assertTrue(regions.size() == 0);
     }
 
+    @Test
+    public void testDivideListOfRegions() {
+        List<Region> inputRegions = Arrays.asList(new Region("1", 500, 2000), new Region("2", 10000, 12750));
+        List<Region> dividedRegions = regionMaker.divideListOfRegions(inputRegions);
+        assertTrue(dividedRegions.size() == 5);
+        assertTrue(dividedRegions.contains(new Region("1", 500, 1499)));
+        assertTrue(dividedRegions.contains(new Region("1", 1500, 2000)));
+        assertTrue(dividedRegions.contains(new Region("2", 10000, 10999)));
+        assertTrue(dividedRegions.contains(new Region("2", 11000, 11999)));
+        assertTrue(dividedRegions.contains(new Region("2", 12000, 12750)));
+    }
 
 }

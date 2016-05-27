@@ -50,4 +50,12 @@ public class RegionDivider {
             return regions;
         }
     }
+
+    public List<Region> divideListOfRegions(List<Region> regions) {
+        List<Region> dividedRegions = new ArrayList<>();
+        for (Region region : regions) {
+            dividedRegions.addAll(this.divideRegionInChunks(region));
+        }
+        return dividedRegions;
+    }
 }
