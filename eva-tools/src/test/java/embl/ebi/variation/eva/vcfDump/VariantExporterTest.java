@@ -15,8 +15,6 @@
  */
 package embl.ebi.variation.eva.vcfdump;
 
-import com.mongodb.DB;
-import com.mongodb.MongoClient;
 import embl.ebi.variation.eva.vcfdump.cellbasewsclient.CellbaseWSClient;
 import htsjdk.variant.variantcontext.Allele;
 import htsjdk.variant.variantcontext.Genotype;
@@ -54,7 +52,6 @@ import static org.junit.Assert.assertTrue;
  * @author Jose Miguel Mut Lopez &lt;jmmut@ebi.ac.uk&gt;
  */
 public class VariantExporterTest {
-    private static final String DB_NAME = "VariantExporterTest";
 
     private static final Logger logger = LoggerFactory.getLogger(VariantExporterTest.class);
 
@@ -73,14 +70,14 @@ public class VariantExporterTest {
      */
     @BeforeClass
     public static void setUpClass() throws IOException, InterruptedException, URISyntaxException, IllegalAccessException, ClassNotFoundException, InstantiationException, StorageManagerException {
-        cleanDBs();
-        fillDB();
+        VariantExporterTestDB.cleanDBs();
+        VariantExporterTestDB.fillDB();
 
         Config.setOpenCGAHome(System.getenv("OPENCGA_HOME") != null ? System.getenv("OPENCGA_HOME") : "/opt/opencga");
         cellBaseClient = new CellbaseWSClient("hsapiens");
         logger.info("using cellbase: " + cellBaseClient.getUrl() + " version " + cellBaseClient.getVersion());
         variantStorageManager = StorageManagerFactory.getVariantStorageManager();
-        variantDBAdaptor = variantStorageManager.getDBAdaptor(DB_NAME, null);
+        variantDBAdaptor = variantStorageManager.getDBAdaptor(VariantExporterTestDB.DB_NAME, null);
         variantSourceDBAdaptor = variantDBAdaptor.getVariantSourceDBAdaptor();
     }
 
@@ -91,12 +88,12 @@ public class VariantExporterTest {
      */
     @AfterClass
     public static void tearDownClass() throws UnknownHostException {
-        cleanDBs();
+        VariantExporterTestDB.cleanDBs();
     }
 
     @Test
     public void getSources() {
-        VariantExporter variantExporter = new VariantExporter(null, null, new QueryOptions());
+        VariantExporter variantExporter = new VariantExporter(null);
 
         // one study
         String study7Id = "7";
@@ -134,7 +131,7 @@ public class VariantExporterTest {
 
     @Test
     public void getVcfHeaders() throws IOException {
-        VariantExporter variantExporter = new VariantExporter(null, null, new QueryOptions());
+        VariantExporter variantExporter = new VariantExporter(null);
         String study7Id = "7";
         String study8Id = "8";
         List<String> studies = Arrays.asList(study7Id, study8Id);
@@ -161,7 +158,7 @@ public class VariantExporterTest {
     @Test
     public void testExportTwoStudies() throws Exception {
         List<String> studies = Arrays.asList("7", "8");
-        String region = "20:61000-69000";
+        String region = "20:71000-79000";
         // TODO Both studies have 219 variants in the region... check if we can choose some region with different number of variants
         QueryOptions query = new QueryOptions();
         Map<String, List<VariantContext>> exportedVariants = exportAndCheck(query, studies, region);
@@ -280,7 +277,7 @@ public class VariantExporterTest {
         assertEquals(2, variants.size());
         removeSrc(variants);    // <---- this is the key point of the test
 
-        VariantExporter variantExporter = new VariantExporter(null, null, null);
+        VariantExporter variantExporter = new VariantExporter(null);
         Map<String, VariantContext> variantContext = variantExporter.convertBiodataVariantToVariantContext(variants.get(0), studies, null);
 
         List<String> alleles = Arrays.asList("C", "A", ".");
@@ -320,7 +317,7 @@ public class VariantExporterTest {
         List<Variant> variants = factory.create(variantSource, multiallelicLine);
         assertEquals(2, variants.size());
 
-        VariantExporter variantExporter = new VariantExporter(cellBaseClient, null, null);
+        VariantExporter variantExporter = new VariantExporter(cellBaseClient);
         Map<String, VariantContext> variantContext = variantExporter.convertBiodataVariantToVariantContext(variants.get(0), studyIds, null);
 
         List<String> alleles = Arrays.asList("C", "A", ".");
@@ -357,7 +354,7 @@ public class VariantExporterTest {
 
 
     private Map<String, List<VariantContext>> exportAndCheck(QueryOptions query, List<String> studies, String region) {
-        VariantExporter variantExporter = new VariantExporter(cellBaseClient, null, null);
+        VariantExporter variantExporter = new VariantExporter(cellBaseClient);
         query.put(VariantDBAdaptor.STUDIES, studies);
         query.add(VariantDBAdaptor.REGION, region);
 
@@ -401,37 +398,6 @@ public class VariantExporterTest {
         return variantSource;
     }
 
-    private static void cleanDBs() throws UnknownHostException {
-        logger.info("Cleaning test DBs ...");
-        MongoClient mongoClient = new MongoClient("localhost");
-        List<String> dbs = Arrays.asList(DB_NAME);
-        for (String dbName : dbs) {
-            DB db = mongoClient.getDB(dbName);
-            db.dropDatabase();
-        }
-        mongoClient.close();
-    }
-
-    private static void fillDB() throws IOException, InterruptedException {
-        String dump = VariantExporterTest.class.getResource("/dump/").getFile();
-        logger.info("restoring DB from " + dump);
-        Process exec = Runtime.getRuntime().exec("mongorestore " + dump);
-        exec.waitFor();
-        String line;
-        BufferedReader bufferedReader = new BufferedReader(new InputStreamReader(exec.getInputStream()));
-        while ((line = bufferedReader.readLine()) != null) {
-            logger.info("mongorestore output:" + line);
-        }
-        bufferedReader.close();
-        bufferedReader = new BufferedReader(new InputStreamReader(exec.getErrorStream()));
-        while ((line = bufferedReader.readLine()) != null) {
-            logger.info("mongorestore errorOutput:" + line);
-        }
-        bufferedReader.close();
-
-        logger.info("mongorestore exit value: " + exec.exitValue());
-    }
-
     private void removeSrc(List<Variant> variants) {
         for (Variant variant : variants) {
             for (VariantSourceEntry variantSourceEntry : variant.getSourceEntries().values()) {
@@ -439,64 +405,7 @@ public class VariantExporterTest {
             }
         }
     }
-//
-//    private void assertEqualLinesFilesAndDB(List<String> fileNames, VariantDBIterator iterator) throws IOException {
-//        long lines = 0;
-//        for (String fileName : fileNames) {
-//            lines += countLines(fileName);
-//        }
-//
-//        // counting variants in the DB
-//        long variantRows = countRows(iterator);
-//
-//        assertEquals(variantRows, lines);
-//    }
-//
-//    private long countRows(Iterator<Variant> iterator) {
-//        int variantRows = 0;
-//        while(iterator.hasNext()) {
-//            iterator.next();
-//            variantRows++;
-//        }
-//        return variantRows;
-//    }
-//
-//    private long countLines(String fileName) throws IOException {
-//        long lines;
-//        lines = 0;
-//        BufferedReader file = new BufferedReader(new InputStreamReader(new GZIPInputStream(new FileInputStream(fileName))));
-//        String line;
-//        while ((line = file.readLine()) != null) {
-//            if (line.charAt(0) != '#') {
-//                lines++;
-//            }
-//        }
-//        file.close();
-//        return lines;
-//    }
-//
-//    private void assertVcfOrderedByCoordinate(String fileName) {
-//        logger.info("Checking that {} is sorted by coordinate", fileName);
-//        Set<String> finishedContigs = new HashSet<>();
-//        VCFFileReader vcfReader = new VCFFileReader(new File(fileName), false);
-//        String lastContig = null;
-//        int previousStart = -1;
-//
-//        for (VariantContext variant : vcfReader) {
-//            // check chromosome
-//            if (lastContig == null || !variant.getContig().equals(lastContig)) {
-//                if (lastContig != null) {
-//                    finishedContigs.add(lastContig);
-//                }
-//                lastContig = variant.getContig();
-//                assertFalse("The variants should by grouped by contig in the vcf output", finishedContigs.contains(lastContig));
-//                previousStart = -1;
-//            }
-//            assertTrue("The vcf is not sorted by coordinate: " + variant, variant.getStart() >= previousStart);
-//            previousStart = variant.getStart();
-//        }
-//
-//    }
+
 
     private void assertEqualGenotypes(Variant variant, VariantContext variantContext, List<String> alleles) {
         for (Map.Entry<String, Map<String, String>> data : variant.getSourceEntries().values().iterator().next().getSamplesData().entrySet()) {
@@ -509,13 +418,6 @@ public class VariantExporterTest {
                     genotype.getAllele(1));
         }
     }
-//
-//    private QueryOptions getQuery(List<String> studies) {
-//        QueryOptions query = new QueryOptions();
-//        query.put(VariantDBAdaptor.STUDIES, studies);
-//        return query;
-//    }
-
 
     private static boolean variantInExportedVariantsCollection(Variant variant, List<VariantContext> exportedVariants) {
         if (exportedVariants.stream().anyMatch(v -> sameVariant(variant, v))) {

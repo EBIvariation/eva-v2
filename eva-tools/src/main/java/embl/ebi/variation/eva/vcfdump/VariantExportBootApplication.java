@@ -17,7 +17,6 @@ package embl.ebi.variation.eva.vcfdump;
 
 import com.beust.jcommander.JCommander;
 import com.beust.jcommander.ParameterException;
-import java.util.List;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 import javax.ws.rs.core.MultivaluedHashMap;
@@ -69,14 +68,13 @@ public class VariantExportBootApplication implements CommandLineRunner {
         Config.setOpenCGAHome(System.getenv("OPENCGA_HOME") != null ? System.getenv("OPENCGA_HOME") : "/opt/opencga");
         
         try {
-            List<String> fileNames = 
                     new VariantExporterController(
                             command.species, 
                             command.database, 
                             command.studies, 
                             command.files, 
-                            command.outdir, 
-                            new MultivaluedHashMap<String, String>()).run();
+                            command.outdir,
+                            new MultivaluedHashMap<>()).run();
         } catch (Exception e) {
             logger.log(Level.SEVERE, "Unsuccessful VCF export: {0}", e.getMessage());
             System.exit(1);

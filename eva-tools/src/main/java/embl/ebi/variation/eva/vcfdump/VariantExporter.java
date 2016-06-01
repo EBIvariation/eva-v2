@@ -15,44 +15,27 @@
  */
 package embl.ebi.variation.eva.vcfdump;
 
-import com.mongodb.BasicDBObject;
 import embl.ebi.variation.eva.vcfdump.cellbasewsclient.CellbaseWSClient;
-import embl.ebi.variation.eva.vcfdump.regionutils.IntersectingRegionsMerger;
-import embl.ebi.variation.eva.vcfdump.regionutils.RegionDivider;
-import htsjdk.samtools.SAMSequenceDictionary;
-import htsjdk.samtools.SAMSequenceRecord;
 import htsjdk.tribble.FeatureCodecHeader;
 import htsjdk.tribble.readers.LineIterator;
 import htsjdk.variant.variantcontext.*;
-import htsjdk.variant.variantcontext.writer.Options;
-import htsjdk.variant.variantcontext.writer.VariantContextWriter;
-import htsjdk.variant.variantcontext.writer.VariantContextWriterBuilder;
 import htsjdk.variant.vcf.VCFCodec;
 import htsjdk.variant.vcf.VCFFilterHeaderLine;
 import htsjdk.variant.vcf.VCFHeader;
-import org.apache.commons.lang.StringUtils;
 import org.opencb.biodata.models.feature.Region;
-import org.opencb.biodata.models.variant.*;
-import org.opencb.cellbase.core.client.CellBaseClient;
-import org.opencb.cellbase.core.common.GenomeSequenceFeature;
+import org.opencb.biodata.models.variant.Variant;
+import org.opencb.biodata.models.variant.VariantSource;
+import org.opencb.biodata.models.variant.VariantSourceEntry;
 import org.opencb.datastore.core.QueryOptions;
-import org.opencb.datastore.core.QueryResponse;
-import org.opencb.datastore.core.QueryResult;
-import org.opencb.opencga.storage.core.variant.adaptors.VariantDBAdaptor;
 import org.opencb.opencga.storage.core.variant.adaptors.VariantDBIterator;
 import org.opencb.opencga.storage.core.variant.adaptors.VariantSourceDBAdaptor;
-import org.opencb.opencga.storage.mongodb.variant.DBObjectToVariantConverter;
 import org.opencb.opencga.storage.mongodb.variant.DBObjectToVariantSourceConverter;
-import org.opencb.opencga.storage.mongodb.variant.VariantMongoDBAdaptor;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.ByteArrayInputStream;
-import java.io.File;
 import java.io.IOException;
-import java.nio.file.Paths;
 import java.util.*;
-import java.util.stream.Collectors;
 
 /**
  * Created by jmmut on 2015-10-28.
@@ -62,22 +45,14 @@ import java.util.stream.Collectors;
 public class VariantExporter {
 
     private static final Logger logger = LoggerFactory.getLogger(VariantExporter.class);
-    private static final int WINDOW_SIZE = 20000;
-    private final QueryOptions options;
-    private final RegionDivider regionDivider;
 
     private CellbaseWSClient cellbaseClient;
-    private VariantDBAdaptor variantDBAdaptor;
     /**
      * Read only. Keeps track of the total failed variants across several dumps. To accumulate, use the same instance of
      * VariantExporter to dump several VCFs. If you just want to count on one dump, use a `new VariantExporter` each time.
      */
-    private int failedVariantsTotal = 0;
-    private int writtenVariants;
     private int failedVariants;
-    private long totalQuerying = 0;
     private String regionSequence;
-    private List<Region> regionsInFilter;
 
     /**
      * if the variants will have empty alleles (such as normalized deletions: "A" to "") CellBase is mandatory to
@@ -87,102 +62,18 @@ public class VariantExporter {
      *
      * If there won't be empty alleles, CellBase is not needed, and the parameter may be null.
      *  @param cellbaseClient for empty alleles. nullable.
-     * @param variantDBAdaptor
-     * @param query
      */
-    public VariantExporter(CellbaseWSClient cellbaseClient, VariantDBAdaptor variantDBAdaptor, QueryOptions query) {
+    public VariantExporter(CellbaseWSClient cellbaseClient) {
         this.cellbaseClient = cellbaseClient;
-        this.variantDBAdaptor = variantDBAdaptor;
-        this.options = query;
-        this.regionDivider = new RegionDivider(WINDOW_SIZE);
-    }
-
-    /**
-     * Main method of this class. It generates one VCF file per requested study,
-     * writing both the header meta-data and the variants in the body.
-     *
-
-     * @param outputDir directory to write the output vcf(s) to
-     * @param sourceDBAdaptor to retrieve all the VariantSources in any VariantSourceEntry
-     * @return list of files written, one per study.
-     */
-    public List<String> vcfExport(String outputDir, VariantSourceDBAdaptor sourceDBAdaptor) throws IOException {
-
-        // 3 steps to get the headers of all the studyIds: ask the sourceAdaptor for VariantSources, check we got everything, build the headers.
-        List<String> studyIds = options.getAsStringList(VariantDBAdaptor.STUDIES);
-
-        // 1) retrieve the sources
-        Map<String, VariantSource> sources = getSources(sourceDBAdaptor, studyIds);
-
-        // 2) check that sourceDBAdaptor got all the studyIds
-        for (String studyId : studyIds) {
-            if (!sources.containsKey(studyId)) {
-                throw new IllegalArgumentException("Aborting VCF export: missing header for study " + studyId);
-            }
-        }
-
-        // 3) check and get the headers, one for each source
-        Map<String, VCFHeader> headers = getVcfHeaders(sources);
-
-        // from here we grant that `headers` have all the headers requested in `studyIds`
-
-        String suffix = ".exported.vcf.gz";
-        List<String> files = new ArrayList<>();
-        Map<String, VariantContextWriter> writers = new TreeMap<>();
-
-        // setup writers
-        for (String studyId : studyIds) {
-            VariantContextWriterBuilder builder = new VariantContextWriterBuilder();
-            File outFile = Paths.get(outputDir).resolve(studyId + suffix).toFile();
-            files.add(outFile.getPath());
-            SAMSequenceDictionary sequenceDictionary;
-            try {
-                sequenceDictionary = headers.get(studyId).getSequenceDictionary();
-            } catch (Exception e) {
-                sequenceDictionary = null;
-            }
-            VariantContextWriter writer = builder
-                    .setOutputFile(outFile)
-                    .setReferenceDictionary(sequenceDictionary)
-                    .unsetOption(Options.INDEX_ON_THE_FLY)
-                    .build();
-            writers.put(studyId, writer);
-            writer.writeHeader(headers.get(studyId));
-        }
-
-        logger.info("Exporting to files: [" + StringUtils.join(files, " ") + "]");
-
-        // actual loop
-        failedVariants = 0;
-        writtenVariants = 0;
-
-        Set<String> chromosomes = getChromosomes(headers, studyIds, options);
-        if (chromosomes.isEmpty()) {
-            dumpVariants(studyIds, writers, options);
-        } else {
-            for (String chromosome : chromosomes) {
-                //dumpVariantsForChromosome(chromosome, sources, writers);
-                dumpVariantsForChromosomeUsingRegions(chromosome, studyIds, writers);
-            }
-        }
-        logger.debug("Total time spent querying to database: {}", totalQuerying);
-
-
-        logger.info("total variants written: " + writtenVariants);
-        if (failedVariants > 0) {
-            logger.warn(failedVariants + " variants were not written due to errors");
-        }
-        this.failedVariantsTotal += failedVariants;
-
-        for (VariantContextWriter variantContextWriter : writers.values()) {
-            variantContextWriter.close();
-        }
-
-        return files;
     }
 
     public Map<String, List<VariantContext>> export(VariantDBIterator iterator, Region region, List<String> studyIds) {
         Map<String, List<VariantContext>> variantsToExportByStudy = new HashMap<>();
+        failedVariants = 0;
+
+        // region sequence contains the last exported region: we set it to null to get the new region sequence from cellbase if needed
+        regionSequence = null;
+
         while (iterator.hasNext()) {
             Variant variant = iterator.next();
             if (region.contains(variant.getChromosome(), variant.getStart())) {
@@ -196,7 +87,6 @@ public class VariantExporter {
                     logger.warn("Variant {}:{}:{}>{} dump failed: {}", variant.getChromosome(), variant.getStart(), variant.getReference(),
                             variant.getAlternate(), e.getMessage());
                     failedVariants++;
-                    // TODO: get failed variants in the controller
                 }
             }
         }
@@ -205,199 +95,11 @@ public class VariantExporter {
 
     public Map<String, VariantSource> getSources(VariantSourceDBAdaptor sourceDBAdaptor, List<String> studyIds) {
         Map<String, VariantSource> sources = new TreeMap<>();
-        List<VariantSource> sourcesList = sourceDBAdaptor.getAllSourcesByStudyIds(studyIds, options).getResult();
+        List<VariantSource> sourcesList = sourceDBAdaptor.getAllSourcesByStudyIds(studyIds, new QueryOptions()).getResult();
         for (VariantSource variantSource : sourcesList) {
             sources.put(variantSource.getStudyId(), variantSource);
         }
         return sources;
-    }
-
-    private void dumpVariantsForChromosomeUsingRegions(String chromosome, List<String> studyIds, Map<String, VariantContextWriter> writers) throws IOException {
-        List<Region> allRegionsInChromosome = getRegionsForChromosome(chromosome, options);
-        for (Region region : allRegionsInChromosome) {
-            regionSequence = null;
-            long start = System.currentTimeMillis();
-            Map<String, List<VariantContext>> variantsInRegion = dumpVariantsInRegion(region, studyIds);
-            long queryFinished = System.currentTimeMillis();
-
-            writeChunkToOutputFiles(variantsInRegion, writers);
-            long writeAndSortFinished = System.currentTimeMillis();
-
-            logger.debug("Time(ms.) getting region {} variants: {}", region, (queryFinished - start));
-            totalQuerying += (queryFinished - start);
-            logger.debug("Time(ms) sorting and writing region {}: {}", region, (writeAndSortFinished - queryFinished));
-            logger.debug("Total time processing region {}: {}", region, (writeAndSortFinished - start));
-        }
-    }
-
-    private List<Region> getRegionsForChromosome(String chromosome, QueryOptions queryOptions) {
-        String regionFilter = queryOptions.getString("region");
-
-        int minStart = getMinStart(chromosome);
-        int maxStart = getMaxStart(chromosome);
-        logger.debug("Chromosome {} maxStart: {}", chromosome, maxStart);
-        logger.debug("Chromosome {} minStart: {}", chromosome, minStart);
-
-        if (regionFilter == null || regionFilter.isEmpty()) {
-            return getRegionsForChromosome(chromosome, minStart, maxStart);
-        } else {
-            List<Region> chromosomeRegionsFromQuery =
-                    getRegionsFromQuery(regionFilter).stream().filter(r -> r.getChromosome().equals(chromosome)).collect(new IntersectingRegionsMerger());
-
-            String commaSeparatedRegionList = chromosomeRegionsFromQuery.stream().map(Region::toString).collect(Collectors.joining(", "));
-            logger.debug("Chromosome {} regions from query: {}", chromosome, commaSeparatedRegionList);
-
-            return getRegionsListForQueryRegions(chromosomeRegionsFromQuery);
-
-        }
-
-    }
-
-    private int getMinStart(String chromosome) {
-        QueryOptions minQuery = addChromosomeSortAndLimitToQuery(chromosome, true);
-        return getVariantStart(minQuery);
-    }
-
-    private int getMaxStart(String chromosome) {
-        QueryOptions maxQuery = addChromosomeSortAndLimitToQuery(chromosome, false);
-        return getVariantStart(maxQuery);
-    }
-
-    private List<Region> getRegionsFromQuery(String regionFilter) {
-        if (regionsInFilter == null) {
-            regionsInFilter = Region.parseRegions(regionFilter);
-        }
-        return regionsInFilter;
-    }
-
-
-
-    private List<Region> getRegionsForChromosome(String chromosome, int chromosomeMinStart, int chromosomeMaxStart) {
-        List<Region> regions = regionDivider.divideRegionInChunks(chromosome, chromosomeMinStart, chromosomeMaxStart);
-        logger.debug("Number of regions in chromosome{}: {}", chromosome, regions.size());
-        if (!regions.isEmpty()) {
-            logger.debug("First region: {}", regions.get(0));
-            logger.debug("Last region: {}", regions.get(regions.size() - 1));
-        }
-
-        return regions;
-    }
-
-    private List<Region> getRegionsListForQueryRegions(List<Region> regionsFromQuery) {
-        List<Region> regions = new ArrayList<>();
-        for (Region region : regionsFromQuery) {
-            regions.addAll(regionDivider.divideRegionInChunks(region));
-        }
-        return regions;
-    }
-
-    private QueryOptions addChromosomeSortAndLimitToQuery(String chromosome, boolean ascending) {
-        QueryOptions chromosomeSortedByStartQuery = new QueryOptions(options);
-        chromosomeSortedByStartQuery.put(VariantDBAdaptor.CHROMOSOME, chromosome);
-
-        BasicDBObject sortDBObject = new BasicDBObject();
-        int orderOperator = ascending ? 1 : -1;
-        sortDBObject.put("chr", orderOperator);
-        sortDBObject.put("start", orderOperator);
-        chromosomeSortedByStartQuery.put("sort", sortDBObject);
-
-        chromosomeSortedByStartQuery.put("limit", 1);
-
-        return chromosomeSortedByStartQuery;
-    }
-
-    private int getVariantStart(QueryOptions query) {
-        int start = -1;
-        VariantDBIterator variantDBIterator = variantDBAdaptor.iterator(query);
-        if (variantDBIterator.hasNext()) {
-            Variant variant = variantDBIterator.next();
-            start = variant.getStart();
-        }
-
-        return start;
-    }
-
-
-    private Map<String, List<VariantContext>> dumpVariantsInRegion(Region region, List<String> studyIds) throws IOException {
-        Map<String, List<VariantContext>> dumpedVariants = new HashMap<>();
-        QueryOptions regionQuery = addRegionToQuery(region);
-        regionQuery = addProjectionToQuery(regionQuery);
-        VariantDBIterator variantDBIterator = variantDBAdaptor.iterator(regionQuery);
-        while (variantDBIterator.hasNext()) {
-            Variant variant = variantDBIterator.next();
-            if (region.contains(variant.getChromosome(), variant.getStart())) {
-                try {
-                    Map<String, VariantContext> variantContexts = convertBiodataVariantToVariantContext(variant, studyIds, region);
-                    for (Map.Entry<String, VariantContext> variantContext : variantContexts.entrySet()) {
-                        dumpedVariants.putIfAbsent(variantContext.getKey(), new ArrayList<>());
-                        dumpedVariants.get(variantContext.getKey()).add(variantContext.getValue());
-                    }
-                    writtenVariants++;
-                    if (writtenVariants % 100000 == 0) {
-                        logger.info("written variants: " + writtenVariants);
-                    }
-                } catch (Exception e) {
-                    logger.warn("Variant {}:{}:{}>{} dump failed: {}", variant.getChromosome(), variant.getStart(), variant.getReference(),
-                            variant.getAlternate(), e.getMessage());
-                    failedVariants++;
-                }
-            }
-        }
-
-        for (List<VariantContext> regionVariants : dumpedVariants.values()) {
-            Collections.sort(regionVariants, (v1, v2)-> v1.getStart() - v2.getStart());
-        }
-
-        return dumpedVariants;
-    }
-
-    private QueryOptions addProjectionToQuery(QueryOptions regionQuery) {
-        String fieldsToInclude = String.join(",", Arrays.asList(VariantMongoDBAdaptor.REFERENCE, "alternative",
-                DBObjectToVariantConverter.START_FIELD, DBObjectToVariantConverter.END_FIELD, VariantMongoDBAdaptor.CHROMOSOME,
-                "sourceEntries"));
-        regionQuery.put("include", fieldsToInclude);
-        return regionQuery;
-    }
-
-    private QueryOptions addRegionToQuery(Region region) {
-        QueryOptions regionQuery = new QueryOptions(options);
-        regionQuery.put("region", region.toString());
-        return regionQuery;
-    }
-
-    private void writeChunkToOutputFiles(Map<String, List<VariantContext>> variantsPerStudyInChunk, Map<String, VariantContextWriter> writers) {
-        for (Map.Entry<String, List<VariantContext>> variantsPerStudy : variantsPerStudyInChunk.entrySet()) {
-            String study = variantsPerStudy.getKey();
-            if (writers.containsKey(study)) {
-                VariantContextWriter writer = writers.get(study);
-                variantsPerStudy.getValue().forEach(writer::add);
-            }
-        }
-    }
-
-    private void dumpVariants(List<String> studyIds, Map<String, VariantContextWriter> writers, QueryOptions query) {
-        query = addProjectionToQuery(query);
-        VariantDBIterator variantDBIterator = variantDBAdaptor.iterator(query);
-        while (variantDBIterator.hasNext()) {
-            Variant variant = variantDBIterator.next();
-            try {
-                Map<String, VariantContext> variantContexts = convertBiodataVariantToVariantContext(variant, studyIds, null);
-                for (Map.Entry<String, VariantContext> variantContextEntry : variantContexts.entrySet()) {
-                    if (writers.containsKey(variantContextEntry.getKey())) {
-                        writers.get(variantContextEntry.getKey()).add(variantContextEntry.getValue());
-                    }
-                }
-            } catch (Exception e) {
-                logger.info(String.format("Variant dump failed: \"%s:%d:%s>%s\"", variant.getChromosome(),
-                        variant.getStart(), variant.getReference(), variant.getAlternate()),
-                        e);
-                failedVariants++;
-            }
-            writtenVariants++;
-            if (writtenVariants % 100000 == 0) {
-                logger.info("written variants: " + writtenVariants);
-            }
-        }
     }
 
     /**
@@ -455,40 +157,8 @@ public class VariantExporter {
 
     }
 
-    private Set<String> getChromosomes(Map<String, VCFHeader> headers, List<String> studyIds, QueryOptions options) {
-        Set<String> chromosomes;
-
-        List<String> regions = options.getAsStringList(VariantDBAdaptor.REGION);
-        if (regions.size() > 0) {
-            chromosomes = getChromosomesFromRegionFilter(regions);
-        } else {
-            chromosomes = cellbaseClient.getChromosomes();
-            if (chromosomes == null || chromosomes.isEmpty()) {
-                chromosomes = getChromosomesFromVCFHeader(headers, studyIds);
-            }
-        }
-
-        return chromosomes;
-    }
-
-    private Set<String> getChromosomesFromRegionFilter(List<String> regions) {
-        return regions.stream().map(r -> r.split(":")[0]).collect(Collectors.toSet());
-    }
-
-    private Set<String> getChromosomesFromVCFHeader(Map<String, VCFHeader> headers, List<String> studyIds) {
-        Set<String> chromosomes = new HashSet<>();
-        // TODO: test with a saved study VCF header
-        // setup writers
-        for (String studyId : studyIds) {
-            SAMSequenceDictionary sequenceDictionary = headers.get(studyId).getSequenceDictionary();
-            chromosomes.addAll(sequenceDictionary.getSequences().stream().map(SAMSequenceRecord::getSequenceName).collect(Collectors.toSet()));
-        }
-
-        return chromosomes;
-    }
-
     public int getFailedVariants() {
-        return failedVariantsTotal;
+        return failedVariants;
     }
 
     /**
