@@ -17,6 +17,7 @@ package embl.ebi.variation.eva.pipeline.jobs;
 
 import java.io.*;
 
+import embl.ebi.variation.eva.pipeline.listeners.VariantJobParametersListener;
 import embl.ebi.variation.eva.pipeline.steps.*;
 import org.junit.AfterClass;
 import org.junit.BeforeClass;
@@ -53,7 +54,7 @@ import static org.junit.Assert.*;
  * @author Jose Miguel Mut Lopez &lt;jmmut@ebi.ac.uk&gt;
  */
 @RunWith(SpringJUnit4ClassRunner.class)
-@ContextConfiguration(classes = {VariantConfiguration.class})
+@ContextConfiguration(classes = {VariantConfiguration.class, VariantJobParametersListener.class})
 public class VariantConfigurationTest {
 
     public static final String FILE_20 = "/small20.vcf.gz";
@@ -62,7 +63,7 @@ public class VariantConfigurationTest {
 
     private static final Logger logger = LoggerFactory.getLogger(VariantConfigurationTest.class);
 
-    // iterable doing an enum. Does it worth it?
+    // iterable doing an enum. Does it worth it? yes
     private static final String VALID_TRANSFORM = "VariantConfigurationTest_vt";
     private static final String INVALID_TRANSFORM = "VariantConfigurationTest_it";
     private static final String VALID_LOAD = "VariantConfigurationTest_vl";
@@ -496,6 +497,7 @@ public class VariantConfigurationTest {
                 VALID_CREATE_STATS,
                 VALID_LOAD_STATS,
                 VALID_PRE_ANNOT,
+                VALID_ANNOT,
                 VALID_ANNOT_LOAD
         );
     }
