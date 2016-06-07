@@ -165,11 +165,13 @@ public class VariantExporterTest {
         checkExportedVariants(query, studies, exportedVariants);
     }
 
+    // TODO: review this test
 //    @Test
 //    public void textExportWithFilter() {
 //        QueryOptions queryOptions = new QueryOptions();
 //        // TODO: this test should fail, is not exporting all variants
 //        queryOptions.put(VariantDBAdaptor.ID, "rs544625796");
+ //      //     query.put(VariantDBAdaptor.REFERENCE, "A");
 //        List<String> studies = Collections.singletonList("7");
 //        String region = "20:61000-69000";
 //        eMap<String, List<VariantContext>> exportedVariants = xportAndCheck(queryOptions, studies, region);
@@ -177,91 +179,6 @@ public class VariantExporterTest {
 //                // annot-ct=SO%3A0001583
 //
 //    }
-//    @Test
-//    public void testFilter() throws Exception {
-//        List<String> files = Arrays.asList("5");
-//        List<String> studies = Arrays.asList("7");
-//        QueryOptions query = getQuery(files, studies);
-//        String outputDir = "/tmp/";
-//
-//        // tell all variables to filter with
-//        query.put(VariantDBAdaptor.REGION, "20:61000-69000");
-//        query.put(VariantDBAdaptor.REFERENCE, "A");
-//
-//        VariantExporter variantExporter = new VariantExporter(cellBaseClient, variantDBAdaptor, query);
-//        List<String> outputFiles = variantExporter.vcfExport(outputDir, variantSourceDBAdaptor);
-//
-//        ////////// checks
-//
-//        assertEquals(studies.size(), outputFiles.size());
-//        assertEquals(0, variantExporter.getFailedVariants());   // test file should not have failed variants
-//
-//        VariantDBIterator iterator = variantDBAdaptor.iterator(query);
-//        assertEqualLinesFilesAndDB(outputFiles, iterator);
-//
-//        for (String outputFile : outputFiles) {
-//            assertVcfOrderedByCoordinate(outputFile);
-//            boolean delete = new File(outputFile).delete();
-//            assertTrue(delete);
-//        }
-//    }
-
-    // TODO: move logic of check sources to controller or to method get sources
-//    @Test
-//    public void testMissingStudy() throws Exception {
-//        List<String> studies = Arrays.asList("7", "9"); // study 9 doesn't exist
-//        String region = "20:61000-69000";
-//        QueryOptions query = new QueryOptions();
-//        Map<String, List<VariantContext>> exportedVariants = exportAndCheck(query, studies, region);
-//        // TODO: should fail?
-//        //        thrown.expect(IllegalArgumentException.class);  // comment this line to see the actual exception, making the test fail
-//        checkExportedVariants(query, Collections.singletonList("7"), exportedVariants);
-//    }
-//
-//    @Test
-//    public void testMissingStudy() throws Exception {
-//        List<String> studies = Arrays.asList("7", "9"); // study 9 doesn't exist
-//        QueryOptions query = new QueryOptions();
-//        query.add(VariantDBAdaptor.STUDIES, studies);
-//        String outputDir = "/tmp/";
-//
-//        VariantExporter variantExporter = new VariantExporter(cellBaseClient, variantDBAdaptor, query);
-//
-//        thrown.expect(IllegalArgumentException.class);  // comment this line to see the actual exception, making the test fail
-//        variantExporter.vcfExport(outputDir, variantSourceDBAdaptor);
-//    }
-
-
-//
-//    @Test
-//    public void testFilter() throws Exception {
-//        List<String> files = Arrays.asList("5");
-//        List<String> studies = Arrays.asList("7");
-//        QueryOptions query = getQuery(files, studies);
-//        String outputDir = "/tmp/";
-//
-//        // tell all variables to filter with
-//        query.put(VariantDBAdaptor.REGION, "20:61000-69000");
-//        query.put(VariantDBAdaptor.REFERENCE, "A");
-//
-//        VariantExporter variantExporter = new VariantExporter(cellBaseClient, variantDBAdaptor, query);
-//        List<String> outputFiles = variantExporter.vcfExport(outputDir, variantSourceDBAdaptor);
-//
-//        ////////// checks
-//
-//        assertEquals(studies.size(), outputFiles.size());
-//        assertEquals(0, variantExporter.getFailedVariants());   // test file should not have failed variants
-//
-//        VariantDBIterator iterator = variantDBAdaptor.iterator(query);
-//        assertEqualLinesFilesAndDB(outputFiles, iterator);
-//
-//        for (String outputFile : outputFiles) {
-//            assertVcfOrderedByCoordinate(outputFile);
-//            boolean delete = new File(outputFile).delete();
-//            assertTrue(delete);
-//        }
-//    }
-
 
     @Test
     public void testMissingCellbase() throws Exception {
