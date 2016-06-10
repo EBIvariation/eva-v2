@@ -189,8 +189,7 @@ public class VariantExporter {
         Integer start = variant.getStart();
         Integer end = start + reference.length() -1;
         String filter = "PASS";
-        // TODO: avoid creating a list per variant
-        List<String> allelesArray = Arrays.asList(reference, alternate);
+        String[] allelesArray = {reference, alternate};
         Map<String, List<Genotype>> genotypesPerStudy = new TreeMap<>();
 
         for (VariantSourceEntry source : variant.getSourceEntries().values()) {
@@ -222,9 +221,9 @@ public class VariantExporter {
                         contextNucleotide = getContextNucleotideFromCellbase(variant, start, studyId);
                     }
                     // TODO: maybe this can be more efficient
-                    allelesArray.set(0, contextNucleotide + reference);
-                    allelesArray.set(1, contextNucleotide + alternate);
-                    end = start + allelesArray.get(0).length()-1;   // -1 because end is inclusive. [start, end] instead of [start, end)
+                    allelesArray[0] = contextNucleotide + reference;
+                    allelesArray[1] =  contextNucleotide + alternate;
+                    end = start + allelesArray[0].length() - 1;
                 }
 
                 // add the genotypes
@@ -237,8 +236,8 @@ public class VariantExporter {
                         org.opencb.biodata.models.feature.Genotype genotype = new org.opencb.biodata.models.feature.Genotype(gt, reference, alternate);
                         List<Allele> alleles = new ArrayList<>();
                         for (int gtIdx : genotype.getAllelesIdx()) {
-                            if (gtIdx < allelesArray.size() && gtIdx >= 0) {
-                                alleles.add(Allele.create(allelesArray.get(gtIdx), gtIdx == 0));    // allele is reference if the alleleIndex is 0
+                            if (gtIdx < allelesArray.length && gtIdx >= 0) {
+                                alleles.add(Allele.create(allelesArray[gtIdx], gtIdx == 0));    // allele is reference if the alleleIndex is 0
                             } else {
                                 alleles.add(Allele.create(".", false)); // genotype of a secondary alternate, or an actual missing
                             }
