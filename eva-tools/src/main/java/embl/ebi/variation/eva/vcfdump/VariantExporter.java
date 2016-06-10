@@ -119,7 +119,7 @@ public class VariantExporter {
                 LineIterator sourceFromStream = vcfCodec.makeSourceFromStream(bufferedInputStream);
                 FeatureCodecHeader featureCodecHeader = vcfCodec.readHeader(sourceFromStream);
                 VCFHeader headerValue = (VCFHeader) featureCodecHeader.getHeaderValue();
-                headerValue.addMetaDataLine(new VCFFilterHeaderLine("PASS", "Valid variant"));
+                headerValue.addMetaDataLine(new VCFFilterHeaderLine("PASS", "All filters passed"));
                 headers.put(source.getStudyId(), headerValue);
             } else {
                 throw new IllegalArgumentException("File headers not available for study " + source.getStudyId());
