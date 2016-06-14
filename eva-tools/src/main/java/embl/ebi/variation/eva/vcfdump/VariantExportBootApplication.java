@@ -21,6 +21,7 @@ import java.util.logging.Level;
 import java.util.logging.Logger;
 import javax.ws.rs.core.MultivaluedHashMap;
 import org.opencb.opencga.lib.common.Config;
+import org.slf4j.LoggerFactory;
 import org.springframework.boot.CommandLineRunner;
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
@@ -38,7 +39,7 @@ import org.springframework.boot.autoconfigure.SpringBootApplication;
 @SpringBootApplication
 public class VariantExportBootApplication implements CommandLineRunner {
 
-    final Logger logger = Logger.getLogger(getClass().getName());
+    private static final org.slf4j.Logger logger = LoggerFactory.getLogger(VariantExportBootApplication.class);
     VariantExportCommand command;
     JCommander commander;
 
@@ -60,7 +61,7 @@ public class VariantExportBootApplication implements CommandLineRunner {
         try {
             validateArguments(args);
         } catch (ParameterException e) {
-            logger.log(Level.SEVERE, "Invalid argument: {0}", e.getMessage());
+            logger.error("Invalid argument: {}", e.getMessage());
             help();
             System.exit(1);
         }
@@ -76,7 +77,8 @@ public class VariantExportBootApplication implements CommandLineRunner {
                             command.outdir,
                             new MultivaluedHashMap<>()).run();
         } catch (Exception e) {
-            logger.log(Level.SEVERE, "Unsuccessful VCF export: {0}", e.getMessage());
+            logger.error("Unsuccessful VCF export: {}", e.getMessage());
+            logger.debug("Exception details: ", e);
             System.exit(1);
         }
     }
