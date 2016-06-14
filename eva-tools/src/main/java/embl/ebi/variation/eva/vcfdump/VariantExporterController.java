@@ -73,6 +73,7 @@ public class VariantExporterController {
             throws IllegalAccessException, ClassNotFoundException, InstantiationException, StorageManagerException, URISyntaxException {
         this.studies = studies;
         this.files = files;
+        assert outputDir != null;
         this.outputDir = outputDir;
         cellBaseClient = new CellbaseWSClient(species);
         variantDBAdaptor = getVariantDBAdaptor(dbName);
@@ -85,8 +86,8 @@ public class VariantExporterController {
     }
 
     public VariantDBAdaptor getVariantDBAdaptor(String dbName) throws StorageManagerException, IllegalAccessException, ClassNotFoundException, InstantiationException {
+        assert dbName != null;
         VariantStorageManager variantStorageManager = StorageManagerFactory.getVariantStorageManager();
-        VariantDBAdaptor adaptor = variantStorageManager.getDBAdaptor(dbName, null);
         return variantStorageManager.getDBAdaptor(dbName, null);
     }
 
@@ -147,7 +148,6 @@ public class VariantExporterController {
     private void writeRegionVariants(Map<String, VariantContextWriter> writers, Map<String, List<VariantContext>> exportedVariants) {
         exportedVariants.forEach((study, variants) -> {
             if (writers.containsKey(study)) {
-                // TODO: test if is better if we sort into a new collection instead of use the same
                 Collections.sort(variants, (v1, v2)-> v1.getStart() - v2.getStart());
                 VariantContextWriter writer = writers.get(study);
                 variants.forEach(writer::add);
@@ -162,7 +162,6 @@ public class VariantExporterController {
     }
 
     private void checkHeaders(Map<String, VCFHeader> headers) {
-        // TODO: use this exception or something different?
         for (String studyId : studies) {
             if (!headers.containsKey(studyId)) {
                 throw new IllegalArgumentException("Aborting VCF export: missing header for study " + studyId);

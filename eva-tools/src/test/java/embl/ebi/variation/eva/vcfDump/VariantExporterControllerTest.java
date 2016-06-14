@@ -34,6 +34,7 @@ import org.opencb.opencga.storage.core.variant.adaptors.VariantDBIterator;
 import org.opencb.opencga.storage.core.variant.adaptors.VariantSourceDBAdaptor;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.sqlite.core.DB;
 
 import javax.ws.rs.core.MultivaluedHashMap;
 import javax.ws.rs.core.MultivaluedMap;
@@ -92,7 +93,7 @@ public class VariantExporterControllerTest {
         List<String> studies = Arrays.asList("s1", "s2");
         List<String> files = Arrays.asList("f3", "f4", "f5");
 
-        VariantExporterController controller = new VariantExporterController("hsapiens", null, studies, files, null, emptyFilter);
+        VariantExporterController controller = new VariantExporterController("hsapiens", DB_NAME, studies, files, OUTPUT_DIR, emptyFilter);
 
         // empty query parameters
         MultivaluedMap<String, String> emptyParameters = new MultivaluedHashMap<>();
