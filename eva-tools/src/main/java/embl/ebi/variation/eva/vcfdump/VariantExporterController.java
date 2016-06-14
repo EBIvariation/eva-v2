@@ -104,10 +104,6 @@ public class VariantExporterController {
         return query;
     }
 
-//    public List<String> run() throws URISyntaxException, IOException {
-//        return new VariantExporter(cellBaseClient, variantDBAdaptor, query).vcfExport(outputDir, variantSourceDBAdaptor);
-//    }
-
     public void run() {
         Map<String, VCFHeader> headers = getVcfHeaders();
         if (headers != null) {
