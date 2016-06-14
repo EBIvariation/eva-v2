@@ -189,8 +189,8 @@ public class VariantExporterController {
             try {
                 sequenceDictionary = headers.get(studyId).getSequenceDictionary();
             } catch (SAMException e) {
-                logger.warn("Incorrect sequence dictionary in study {}: {}", studyId, e.getMessage());
-                logger.warn("Sequence dictionary won't be included in study {} output VCF header", studyId);
+                logger.warn("Incorrect sequence / contig meta-data found in study {}: {}", studyId, e.getMessage());
+                logger.warn("It won't be included in study {} output VCF header", studyId);
                 sequenceDictionary = null;
             }
 
