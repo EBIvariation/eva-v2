@@ -17,6 +17,7 @@ package embl.ebi.variation.eva.vcfdump;
 
 import embl.ebi.variation.eva.vcfdump.cellbasewsclient.CellbaseWSClient;
 import embl.ebi.variation.eva.vcfdump.regionutils.RegionFactory;
+import htsjdk.samtools.SAMException;
 import htsjdk.samtools.SAMSequenceDictionary;
 import htsjdk.samtools.SAMSequenceRecord;
 import htsjdk.variant.variantcontext.VariantContext;
@@ -107,21 +108,34 @@ public class VariantExporterController {
 //        return new VariantExporter(cellBaseClient, variantDBAdaptor, query).vcfExport(outputDir, variantSourceDBAdaptor);
 //    }
 
-    public void run() throws IOException {
-        // get VCF header(s) and write them to output file(s)
-        Map<String, VariantSource> sources = exporter.getSources(variantSourceDBAdaptor, studies);
-        Map<String, VCFHeader> headers = exporter.getVcfHeaders(sources);
-        checkHeaders(headers);
-        Map<String, VariantContextWriter> writers = getWritters(headers);
-        writers.forEach((study, writer) -> writer.writeHeader(headers.get(study)));
+    public void run() {
+        Map<String, VCFHeader> headers = getVcfHeaders();
+        if (headers != null) {
+            Map<String, VariantContextWriter> writers = getWriters(headers);
+            writers.forEach((study, writer) -> writer.writeHeader(headers.get(study)));
 
-        // get all chromosomes in the query or organism, and export the variants for each chromosome
-        Set<String> chromosomes = getChromosomes(headers, studies, query);
-        for (String chromosome : chromosomes) {
-            exportChromosomeVariants(writers, chromosome);
+            // get all chromosomes in the query or organism, and export the variants for each chromosome
+            Set<String> chromosomes = getChromosomes(headers, studies, query);
+            for (String chromosome : chromosomes) {
+                exportChromosomeVariants(writers, chromosome);
+            }
+
+            writers.values().forEach(VariantContextWriter::close);
         }
+    }
 
-        writers.values().forEach(VariantContextWriter::close);
+    private Map<String, VCFHeader> getVcfHeaders() {
+        // get VCF header(s) and write them to output file(s)
+        logger.info("Generating VCF headers ...");
+        Map<String, VariantSource> sources = exporter.getSources(variantSourceDBAdaptor, studies);
+        Map<String, VCFHeader> headers = null;
+        try {
+            headers = exporter.getVcfHeaders(sources);
+            checkHeaders(headers);
+        } catch (IOException e) {
+            logger.error("Error getting vcf headers: {}", e.getMessage());
+        }
+        return headers;
     }
 
     private void exportChromosomeVariants(Map<String, VariantContextWriter> writers, String chromosome) {
@@ -160,7 +174,7 @@ public class VariantExporterController {
         }
     }
 
-    private Map<String, VariantContextWriter> getWritters(Map<String, VCFHeader> headers) {
+    private Map<String, VariantContextWriter> getWriters(Map<String, VCFHeader> headers) {
         String suffix = ".exported.vcf.gz";
         Map<String, VariantContextWriter> writers = new TreeMap<>();
         outputFilePaths = new HashMap<>();
@@ -170,16 +184,15 @@ public class VariantExporterController {
 
             Path outputPath = Paths.get(outputDir).resolve(studyId + suffix);
             outputFilePaths.put(studyId, outputPath.toString());
-            // TODO: does the get sequence dictionary method throw any exception?
-//            // get sequence dictionary from header
-//            SAMSequenceDictionary sequenceDictionary;
-//            try {
-//                sequenceDictionary = headers.get(studyId).getSequenceDictionary();
-//            } catch (Exception e) {
-//                // TODO: log error
-//                sequenceDictionary = null;
-//            }
-            SAMSequenceDictionary sequenceDictionary = headers.get(studyId).getSequenceDictionary();
+            // get sequence dictionary from header
+            SAMSequenceDictionary sequenceDictionary;
+            try {
+                sequenceDictionary = headers.get(studyId).getSequenceDictionary();
+            } catch (SAMException e) {
+                logger.warn("Incorrect sequence dictionary in study {}: {}", studyId, e.getMessage());
+                logger.warn("Sequence dictionary won't be included in study {} output VCF header", studyId);
+                sequenceDictionary = null;
+            }
 
             VariantContextWriterBuilder builder = new VariantContextWriterBuilder();
             VariantContextWriter writer = builder.setOutputFile(outputPath.toFile())
@@ -206,7 +219,7 @@ public class VariantExporterController {
                 chromosomes = getChromosomesFromVCFHeader(headers, studyIds);
             }
         }
-
+        logger.debug("Chromosomes: {}", String.join(", ", chromosomes));
         return chromosomes;
     }
 
