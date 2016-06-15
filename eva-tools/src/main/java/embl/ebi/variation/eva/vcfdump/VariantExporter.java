@@ -214,6 +214,9 @@ public class VariantExporter {
                 }
 
                 if (emptyAlleles) {
+                    // TODO: the context nucleotide is being retrieved several times for the same variant
+                    // TODO: study this loop, extracting all common code to avoid being executed more than once if not necessary
+                    // TODO: to be fixed in the merge studies feature
                     String contextNucleotide;
                     if (region != null) {
                         contextNucleotide = getContextNucleotideFromCellbaseCachingRegions(variant, start, region, studyId);

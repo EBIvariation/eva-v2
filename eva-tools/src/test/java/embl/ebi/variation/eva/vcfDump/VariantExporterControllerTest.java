@@ -34,7 +34,6 @@ import org.opencb.opencga.storage.core.variant.adaptors.VariantDBIterator;
 import org.opencb.opencga.storage.core.variant.adaptors.VariantSourceDBAdaptor;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.sqlite.core.DB;
 
 import javax.ws.rs.core.MultivaluedHashMap;
 import javax.ws.rs.core.MultivaluedMap;
@@ -51,8 +50,8 @@ import static org.junit.Assert.*;
  */
 public class VariantExporterControllerTest {
 
-    @Rule
-    public ExpectedException thrown = ExpectedException.none();
+//    @Rule
+//    public ExpectedException thrown = ExpectedException.none();
 
     private static final String DB_NAME = "VariantExporterTest";
     public static final String OUTPUT_DIR = "/tmp/";
@@ -60,7 +59,7 @@ public class VariantExporterControllerTest {
     private static CellbaseWSClient cellBaseClient;
     private static VariantStorageManager variantStorageManager;
     private static VariantDBAdaptor variantDBAdaptor;
-    private static VariantSourceDBAdaptor variantSourceDBAdaptor;
+//    private static VariantSourceDBAdaptor variantSourceDBAdaptor;
     private static final Logger logger = LoggerFactory.getLogger(VariantExporterControllerTest.class);
     private static final MultivaluedMap<String, String> emptyFilter = new MultivaluedHashMap<>();
 
@@ -75,7 +74,7 @@ public class VariantExporterControllerTest {
         logger.info("Using cellbase: " + cellBaseClient.getUrl() + " version " + cellBaseClient.getVersion());
         variantStorageManager = StorageManagerFactory.getVariantStorageManager();
         variantDBAdaptor = variantStorageManager.getDBAdaptor(DB_NAME, null);
-        variantSourceDBAdaptor = variantDBAdaptor.getVariantSourceDBAdaptor();
+//        variantSourceDBAdaptor = variantDBAdaptor.getVariantSourceDBAdaptor();
     }
 
     /**
@@ -253,15 +252,36 @@ public class VariantExporterControllerTest {
         }
     }
 
-    @Test
+    @Test(expected = IllegalArgumentException.class)
     public void testMissingStudy() throws Exception {
         List<String> studies = Arrays.asList("7", "9"); // study 9 doesn't exist
 
         VariantExporterController controller = new VariantExporterController("hsapiens", DB_NAME, studies, null, OUTPUT_DIR, emptyFilter);
 
-        // TODO: review this test
-        thrown.expect(IllegalArgumentException.class);  // comment this line to see the actual exception, making the test fail
         controller.run();
+    }
+
+    @Test(expected = IllegalArgumentException.class)
+    public void nullSpeciesThrowsIllegalArgumentException() throws Exception {
+        List<String> studies = Collections.singletonList("8");
+        new VariantExporterController(null, DB_NAME, studies, null, OUTPUT_DIR, emptyFilter);
+    }
+
+    @Test(expected = IllegalArgumentException.class)
+    public void nullDbnameThrowsIllegalArgumentException() throws Exception {
+        List<String> studies = Collections.singletonList("8");
+        new VariantExporterController("hsapiens", null, studies, null, OUTPUT_DIR, emptyFilter);
+    }
+
+    @Test(expected = IllegalArgumentException.class)
+    public void emtpyStudiesThrowsIllegalArgumentException() throws Exception {
+        new VariantExporterController("hsapiens", DB_NAME, Collections.EMPTY_LIST, null, OUTPUT_DIR, emptyFilter);
+    }
+
+    @Test(expected = IllegalArgumentException.class)
+    public void nullOutputDirThrowsIllegalArgumentException() throws Exception {
+        List<String> studies = Collections.singletonList("8");
+        new VariantExporterController("hsapiens", DB_NAME, studies, null, null, emptyFilter);
     }
 
     private void assertEqualLinesFilesAndDB(String fileName, VariantDBIterator iterator) throws IOException {

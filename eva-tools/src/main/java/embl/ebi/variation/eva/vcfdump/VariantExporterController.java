@@ -71,9 +71,9 @@ public class VariantExporterController {
     public VariantExporterController(String species, String dbName, List<String> studies, List<String> files,
                                      String outputDir, MultivaluedMap<String, String> queryParameters)
             throws IllegalAccessException, ClassNotFoundException, InstantiationException, StorageManagerException, URISyntaxException {
+        checkParams(species, studies, outputDir, dbName);
         this.studies = studies;
         this.files = files;
-        assert outputDir != null;
         this.outputDir = outputDir;
         cellBaseClient = new CellbaseWSClient(species);
         variantDBAdaptor = getVariantDBAdaptor(dbName);
@@ -85,8 +85,19 @@ public class VariantExporterController {
         failedVariants = 0;
     }
 
+    private void checkParams(String species, List<String> studies, String outputDir, String dbName) {
+        if (species == null || species.isEmpty()) {
+            throw new IllegalArgumentException("'species' is required");
+        } else if (studies == null || studies.isEmpty()) {
+            throw new IllegalArgumentException("'studies' is required");
+        } else if (outputDir == null || outputDir.isEmpty()) {
+            throw new IllegalArgumentException("'outputDir' is required");
+        } else if (dbName == null || dbName.isEmpty()) {
+            throw new IllegalArgumentException("'dbName' is required");
+        }
+    }
+
     public VariantDBAdaptor getVariantDBAdaptor(String dbName) throws StorageManagerException, IllegalAccessException, ClassNotFoundException, InstantiationException {
-        assert dbName != null;
         VariantStorageManager variantStorageManager = StorageManagerFactory.getVariantStorageManager();
         return variantStorageManager.getDBAdaptor(dbName, null);
     }
