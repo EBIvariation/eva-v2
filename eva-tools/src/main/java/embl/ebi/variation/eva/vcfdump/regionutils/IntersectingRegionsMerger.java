@@ -64,7 +64,9 @@ public class IntersectingRegionsMerger implements Collector<Region, Set<Region>,
                 previousRegion = region;
             }
         }
-        mergedList.add(previousRegion);
+        if (previousRegion != null) {
+            mergedList.add(previousRegion);
+        }
         return mergedList;
     }
 
