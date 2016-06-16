@@ -15,18 +15,16 @@
  */
 package embl.ebi.variation.eva.pipeline.steps;
 
-
-import embl.ebi.variation.eva.pipeline.listeners.JobParametersListener;
 import org.opencb.datastore.core.ObjectMap;
 import org.opencb.opencga.storage.core.StorageManagerFactory;
 import org.opencb.opencga.storage.core.variant.VariantStorageManager;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.batch.core.JobParameters;
-import org.springframework.batch.core.StepContribution;
+import org.springframework.batch.core.*;
 import org.springframework.batch.core.scope.context.ChunkContext;
 import org.springframework.batch.core.step.tasklet.Tasklet;
 import org.springframework.batch.repeat.RepeatStatus;
+import org.springframework.beans.factory.annotation.Autowired;
 
 import java.net.URI;
 import java.net.URISyntaxException;
@@ -40,30 +38,28 @@ import java.nio.file.Paths;
  */
 public class VariantsLoad implements Tasklet {
     private static final Logger logger = LoggerFactory.getLogger(VariantsLoad.class);
-
-    private JobParametersListener listener;
     public static final String SKIP_LOAD = "skipLoad";
 
-    public VariantsLoad(JobParametersListener listener) {
-        this.listener = listener;
-    }
+    @Autowired
+    private ObjectMap variantOptions;
+    @Autowired
+    private ObjectMap pipelineOptions;
 
     @Override
     public RepeatStatus execute(StepContribution contribution, ChunkContext chunkContext) throws Exception {
-        JobParameters parameters = chunkContext.getStepContext().getStepExecution().getJobParameters();
-        ObjectMap variantOptions = listener.getVariantOptions();
 
-        if (Boolean.parseBoolean(parameters.getString(SKIP_LOAD, "false"))) {
-            logger.info("skipping load step, requested " + SKIP_LOAD + "=" + parameters.getString(SKIP_LOAD));
+        if (pipelineOptions.getBoolean(SKIP_LOAD)) {
+            logger.info("skipping load step, skipLoad is set to {}", pipelineOptions.getBoolean(SKIP_LOAD));
         } else {
             VariantStorageManager variantStorageManager = StorageManagerFactory.getVariantStorageManager();// TODO add mongo
-            URI outdirUri = createUri(parameters.getString("outputDir"));
-            URI nextFileUri = createUri(parameters.getString("input"));
-            URI pedigreeUri = parameters.getString("pedigree") != null ? createUri(parameters.getString("pedigree")) : null;
+            URI outdirUri = createUri(pipelineOptions.getString("outputDir"));
+            URI nextFileUri = createUri(pipelineOptions.getString("input"));
+
+//          URI pedigreeUri = pipelineOptions.getString("pedigree") != null ? createUri(pipelineOptions.getString("pedigree")) : null;
             Path output = Paths.get(outdirUri.getPath());
             Path input = Paths.get(nextFileUri.getPath());
-            Path outputVariantJsonFile = output.resolve(input.getFileName().toString() + ".variants.json" + parameters.getString("compressExtension"));
-//                outputFileJsonFile = output.resolve(input.getFileName().toString() + ".file.json" + config.compressExtension);
+            Path outputVariantJsonFile = output.resolve(input.getFileName().toString() + ".variants.json" + pipelineOptions.getString("compressExtension"));
+//          outputFileJsonFile = output.resolve(input.getFileName().toString() + ".file.json" + config.compressExtension);
             URI transformedVariantsUri = outdirUri.resolve(outputVariantJsonFile.getFileName().toString());
 
 
@@ -71,8 +67,8 @@ public class VariantsLoad implements Tasklet {
             variantStorageManager.preLoad(transformedVariantsUri, outdirUri, variantOptions);
             logger.info("-- Load variants -- {}", nextFileUri);
             variantStorageManager.load(transformedVariantsUri, variantOptions);
-//                logger.info("-- PostLoad variants -- {}", nextFileUri);
-//                variantStorageManager.postLoad(transformedVariantsUri, outdirUri, variantOptions);
+//          logger.info("-- PostLoad variants -- {}", nextFileUri);
+//          variantStorageManager.postLoad(transformedVariantsUri, outdirUri, variantOptions);
         }
 
         return RepeatStatus.FINISHED;
@@ -85,4 +81,5 @@ public class VariantsLoad implements Tasklet {
         }
         return sourceUri;
     }
+
 }

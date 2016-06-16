@@ -15,14 +15,14 @@
  */
 package embl.ebi.variation.eva.pipeline.steps;
 
-import embl.ebi.variation.eva.pipeline.listeners.JobParametersListener;
+import org.opencb.datastore.core.ObjectMap;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.batch.core.JobParameters;
 import org.springframework.batch.core.StepContribution;
 import org.springframework.batch.core.scope.context.ChunkContext;
 import org.springframework.batch.core.step.tasklet.Tasklet;
 import org.springframework.batch.repeat.RepeatStatus;
+import org.springframework.beans.factory.annotation.Autowired;
 
 import java.io.*;
 import java.util.Arrays;
@@ -36,30 +36,27 @@ import java.util.zip.GZIPOutputStream;
  */
 public class VariantsAnnotCreate implements Tasklet {
     private static final Logger logger = LoggerFactory.getLogger(VariantsAnnotCreate.class);
-
-    private JobParametersListener listener;
     public static final String SKIP_ANNOT_CREATE = "skipAnnotCreate";
 
-    public VariantsAnnotCreate(JobParametersListener listener) {
-        this.listener = listener;
-    }
+    @Autowired
+    private ObjectMap pipelineOptions;
 
     @Override
     public RepeatStatus execute(StepContribution contribution, ChunkContext chunkContext) throws Exception {
-        JobParameters parameters = chunkContext.getStepContext().getStepExecution().getJobParameters();
 
-        if (Boolean.parseBoolean(parameters.getString(SKIP_ANNOT_CREATE, "false"))) {
-            logger.info("skipping annotation creation step, requested " + SKIP_ANNOT_CREATE + "=" + parameters.getString(SKIP_ANNOT_CREATE));
+        if (pipelineOptions.getBoolean(SKIP_ANNOT_CREATE)) {
+            logger.info("skipping annotation creation step, skipAnnotCreate is set to {} ",
+                    pipelineOptions.getBoolean(SKIP_ANNOT_CREATE));
         } else {
-            ProcessBuilder processBuilder = new ProcessBuilder("perl", 
-                    parameters.getString("vepPath"), 
+            ProcessBuilder processBuilder = new ProcessBuilder("perl",
+                    pipelineOptions.getString("vepPath"),
                     "--cache",
-                    "--cache_version", parameters.getString("vepCacheVersion"),
-                    "-dir", parameters.getString("vepCacheDirectory"),
-                    "--species", parameters.getString("vepSpecies"),
-                    "--fasta", parameters.getString("vepFasta"),
-                    "--fork", parameters.getString("vepNumForks"),
-                    "-i", parameters.getString("vepInput"),
+                    "--cache_version", pipelineOptions.getString("vepCacheVersion"),
+                    "-dir", pipelineOptions.getString("vepCacheDirectory"),
+                    "--species", pipelineOptions.getString("vepSpecies"),
+                    "--fasta", pipelineOptions.getString("vepFasta"),
+                    "--fork", pipelineOptions.getString("vepNumForks"),
+                    "-i", pipelineOptions.getString("vepInput"),
                     "-o", "STDOUT",
                     "--force_overwrite", 
                     "--offline", 
@@ -73,7 +70,7 @@ public class VariantsAnnotCreate implements Tasklet {
             
             int written = connectStreams(
                     new BufferedInputStream(process.getInputStream()), 
-                    new GZIPOutputStream(new FileOutputStream(parameters.getString("vepOutput"))));
+                    new GZIPOutputStream(new FileOutputStream(pipelineOptions.getString("vepOutput"))));
             
             int exitValue = process.waitFor();
             logger.info("Finishing read from VEP output, bytes written: " + written); 

@@ -15,25 +15,21 @@
  */
 package embl.ebi.variation.eva.pipeline.steps;
 
-import embl.ebi.variation.eva.pipeline.listeners.JobParametersListener;
-import org.opencb.biodata.models.variant.VariantSource;
 import org.opencb.datastore.core.ObjectMap;
 import org.opencb.datastore.core.QueryOptions;
 import org.opencb.opencga.storage.core.StorageManagerFactory;
 import org.opencb.opencga.storage.core.variant.VariantStorageManager;
 import org.opencb.opencga.storage.core.variant.adaptors.VariantDBAdaptor;
-import org.opencb.opencga.storage.core.variant.annotation.CellBaseVariantAnnotator;
 import org.opencb.opencga.storage.core.variant.annotation.VariantAnnotationManager;
 import org.opencb.opencga.storage.core.variant.annotation.VariantAnnotator;
 import org.opencb.opencga.storage.core.variant.annotation.VepVariantAnnotator;
-import org.opencb.opencga.storage.core.variant.stats.VariantStatisticsManager;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.batch.core.JobParameters;
 import org.springframework.batch.core.StepContribution;
 import org.springframework.batch.core.scope.context.ChunkContext;
 import org.springframework.batch.core.step.tasklet.Tasklet;
 import org.springframework.batch.repeat.RepeatStatus;
+import org.springframework.beans.factory.annotation.Autowired;
 
 import java.net.URI;
 import java.net.URISyntaxException;
@@ -46,27 +42,23 @@ import java.nio.file.Paths;
  */
 public class VariantsAnnotLoad implements Tasklet {
     private static final Logger logger = LoggerFactory.getLogger(VariantsAnnotLoad.class);
-
-    //    public static final String annotJobName = "variantAnnotationJob";
     public static final String SKIP_ANNOT_LOAD = "skipAnnotLoad";
-    private JobParametersListener listener;
 
-    public VariantsAnnotLoad(JobParametersListener listener) {
-        this.listener = listener;
-    }
+    @Autowired
+    private ObjectMap variantOptions;
+
+    @Autowired
+    private ObjectMap pipelineOptions;
 
     @Override
     public RepeatStatus execute(StepContribution contribution, ChunkContext chunkContext) throws Exception {
 
-        JobParameters parameters = chunkContext.getStepContext().getStepExecution().getJobParameters();
-
-        if (Boolean.parseBoolean(parameters.getString(SKIP_ANNOT_LOAD, "false"))) {
-            logger.info("skipping annot loading, requested " + SKIP_ANNOT_LOAD + "=" + parameters.getString(SKIP_ANNOT_LOAD));
+        if (pipelineOptions.getBoolean(SKIP_ANNOT_LOAD)) {
+            logger.info("skipping annot loading, skipAnnotLoad is set to {} ", pipelineOptions.getBoolean(SKIP_ANNOT_LOAD));
         } else {
-            String vepOutput = parameters.getString("vepOutput");
+            String vepOutput = pipelineOptions.getString("vepOutput");
 
             VariantStorageManager variantStorageManager = StorageManagerFactory.getVariantStorageManager();
-            ObjectMap variantOptions = listener.getVariantOptions();
             VariantDBAdaptor dbAdaptor = variantStorageManager.getDBAdaptor(variantOptions.getString("dbName"), variantOptions);
             VariantAnnotationManager.AnnotationSource annotatorSource = VariantAnnotationManager.AnnotationSource.VEP;
             logger.info("Annotating with {}", annotatorSource);
@@ -79,7 +71,7 @@ public class VariantsAnnotLoad implements Tasklet {
         return RepeatStatus.FINISHED;
     }
 
-    public static URI createUri(String input) throws URISyntaxException {
+    private static URI createUri(String input) throws URISyntaxException {
         URI sourceUri = new URI(input);
         if (sourceUri.getScheme() == null || sourceUri.getScheme().isEmpty()) {
             sourceUri = Paths.get(input).toUri();

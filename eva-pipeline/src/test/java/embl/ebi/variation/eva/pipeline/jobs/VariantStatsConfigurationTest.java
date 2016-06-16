@@ -15,13 +15,17 @@
  */
 package embl.ebi.variation.eva.pipeline.jobs;
 
-import embl.ebi.variation.eva.pipeline.listeners.VariantJobParametersListener;
-import embl.ebi.variation.eva.pipeline.steps.*;
+import embl.ebi.variation.eva.VariantJobsArgs;
+import embl.ebi.variation.eva.pipeline.steps.VariantsLoad;
+import embl.ebi.variation.eva.pipeline.steps.VariantsStatsCreate;
+import embl.ebi.variation.eva.pipeline.steps.VariantsStatsLoad;
 import org.junit.AfterClass;
+import org.junit.Before;
 import org.junit.BeforeClass;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.opencb.biodata.models.variant.VariantSource;
+import org.opencb.datastore.core.ObjectMap;
 import org.opencb.datastore.core.QueryOptions;
 import org.opencb.opencga.storage.core.StorageManagerException;
 import org.opencb.opencga.storage.core.StorageManagerFactory;
@@ -33,11 +37,14 @@ import org.slf4j.LoggerFactory;
 import org.springframework.batch.core.*;
 import org.springframework.batch.core.launch.JobLauncher;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.context.support.PropertySourcesPlaceholderConfigurer;
 import org.springframework.test.context.ContextConfiguration;
 import org.springframework.test.context.junit4.SpringJUnit4ClassRunner;
 
 import java.io.*;
 import java.net.UnknownHostException;
+
+import static embl.ebi.variation.eva.pipeline.jobs.JobTestUtils.getJobParameters;
 import static org.junit.Assert.*;
 
 /**
@@ -46,7 +53,7 @@ import static org.junit.Assert.*;
  * @author Jose Miguel Mut Lopez &lt;jmmut@ebi.ac.uk&gt;
  */
 @RunWith(SpringJUnit4ClassRunner.class)
-@ContextConfiguration(classes = {VariantStatsConfiguration.class, VariantJobParametersListener.class})
+@ContextConfiguration(classes = {VariantStatsConfiguration.class, CommonConfig.class})
 public class VariantStatsConfigurationTest {
 
     public static final String FILE_20 = "/small20.vcf.gz";
@@ -62,10 +69,19 @@ public class VariantStatsConfigurationTest {
     private static final String INVALID_LOAD_STATS = "VariantStatsConfigurationTest_il";
 
     @Autowired
+    PropertySourcesPlaceholderConfigurer propertySourcesPlaceholderConfigurer;
+
+    @Autowired
     private Job job;
 
     @Autowired
     private JobLauncher jobLauncher;
+
+    @Autowired
+    public VariantJobsArgs variantJobsArgs;
+
+    private ObjectMap variantOptions;
+    private ObjectMap pipelineOptions;
 
     /**
      * This test has to fail because it will try to extract variants from a non-existent DB.
@@ -74,32 +90,19 @@ public class VariantStatsConfigurationTest {
     public void invalidCreateStats() throws JobExecutionException {
         String input = VariantStatsConfigurationTest.class.getResource(FILE_20).getFile();
         VariantSource source = new VariantSource(input, "1", "1", "studyName");
-        String opencgaHome = System.getenv("OPENCGA_HOME") != null ? System.getenv("OPENCGA_HOME") : "/opt/opencga";
         String dbName = INVALID_CREATE_STATS;
-        String compressExtension = ".gz";
         String outputDir = "/tmp";
 
-        JobParameters parameters = new JobParametersBuilder()
-                .addString("input", input)
-                .addString("outputDir", outputDir)
-                .addString("dbName", dbName)
-                .addString("compressExtension", compressExtension)
-                .addString("compressGenotypes", "true")
-                .addString("includeSrc", "FIRST_8_COLUMNS")
-                .addString("aggregated", "NONE")
-                .addString("studyType", "COLLECTION")
-                .addString("studyName", source.getStudyName())
-                .addString("studyId", source.getStudyId())
-                .addString("fileId", source.getFileId())
-                .addString("opencga.app.home", opencgaHome)
-                .addString(VariantsStatsLoad.SKIP_STATS_LOAD, "true")
-                .addString(VariantsAnnotGenerateInput.SKIP_ANNOT_GENERATE_INPUT, "true")
-                .addString(VariantsAnnotCreate.SKIP_ANNOT_CREATE, "true")
-                .toJobParameters();
+        pipelineOptions.put("input", input);
+        pipelineOptions.put("outputDir", outputDir);
+        pipelineOptions.put(VariantsLoad.SKIP_LOAD, false);
+        pipelineOptions.put(VariantsStatsCreate.SKIP_STATS_CREATE, false);
+        variantOptions.put(VariantStorageManager.DB_NAME, dbName);
+        variantOptions.put(VariantStorageManager.VARIANT_SOURCE, source);
 
-        JobExecution execution = jobLauncher.run(job, parameters);
+        JobExecution execution = jobLauncher.run(job, getJobParameters());
 
-        assertEquals(input, execution.getJobParameters().getString("input"));
+        assertEquals(input, pipelineOptions.getString("input"));
         assertEquals(ExitStatus.FAILED.getExitCode(), execution.getExitStatus().getExitCode());
     }
 
@@ -109,30 +112,17 @@ public class VariantStatsConfigurationTest {
 
         String input = VariantStatsConfigurationTest.class.getResource(FILE_20).getFile();
         VariantSource source = new VariantSource(input, "1", "1", "studyName");
-        String opencgaHome = System.getenv("OPENCGA_HOME") != null ? System.getenv("OPENCGA_HOME") : "/opt/opencga";
         String dbName = VALID_LOAD_STATS;
-        String compressExtension = ".gz";
         String outputDir = input;
 
-        JobParameters jobParameters = new JobParametersBuilder()
-                .addString("input", input)
-                .addString("outputDir", outputDir)
-                .addString("dbName", dbName)
-                .addString("compressExtension", compressExtension)
-                .addString("compressGenotypes", "true")
-                .addString("includeSrc", "FIRST_8_COLUMNS")
-                .addString("aggregated", "NONE")
-                .addString("studyType", "COLLECTION")
-                .addString("studyName", source.getStudyName())
-                .addString("studyId", source.getStudyId())
-                .addString("fileId", source.getFileId())
-                .addString("opencga.app.home", opencgaHome)
-                .addString(VariantsStatsCreate.SKIP_STATS_CREATE, "true")
-                .addString(VariantsAnnotGenerateInput.SKIP_ANNOT_GENERATE_INPUT, "true")
-                .addString(VariantsAnnotCreate.SKIP_ANNOT_CREATE, "true")
-                .toJobParameters();
+        pipelineOptions.put("input", input);
+        pipelineOptions.put("outputDir", outputDir);
+        pipelineOptions.put(VariantsLoad.SKIP_LOAD, false);
+        pipelineOptions.put(VariantsStatsLoad.SKIP_STATS_LOAD, false);
+        variantOptions.put(VariantStorageManager.DB_NAME, dbName);
+        variantOptions.put(VariantStorageManager.VARIANT_SOURCE, source);
 
-        JobExecution execution = jobLauncher.run(job, jobParameters);
+        JobExecution execution = jobLauncher.run(job, getJobParameters());
         assertEquals(ExitStatus.COMPLETED.getExitCode(), execution.getExitStatus().getExitCode());
 
         // check the DB docs have the field "st"
@@ -150,33 +140,19 @@ public class VariantStatsConfigurationTest {
     public void invalidLoadStats() throws JobExecutionException {
         String input = VariantStatsConfigurationTest.class.getResource(FILE_20).getFile();
         VariantSource source = new VariantSource(input, "4", "1", "studyName");
-        String opencgaHome = System.getenv("OPENCGA_HOME") != null ? System.getenv("OPENCGA_HOME") : "/opt/opencga";
         String dbName = INVALID_LOAD_STATS;
-        String compressExtension = ".gz";
         String outputDir = input;
 
-        JobParameters parameters = new JobParametersBuilder()
-                .addString("input", input)
-                .addString("outputDir", outputDir)
-                .addString("dbName", dbName)
-                .addString("compressExtension", compressExtension)
-                .addString("compressGenotypes", "true")
-                .addString("includeSrc", "FIRST_8_COLUMNS")
-                .addString("aggregated", "NONE")
-                .addString("studyType", "COLLECTION")
-                .addString("studyName", source.getStudyName())
-                .addString("studyId", source.getStudyId())
-                .addString("fileId", source.getFileId())
-                .addString("opencga.app.home", opencgaHome)
-                .addString(VariantsStatsCreate.SKIP_STATS_CREATE, "true")
-                .addString(VariantsAnnotGenerateInput.SKIP_ANNOT_GENERATE_INPUT, "true")
-                .addString(VariantsAnnotCreate.SKIP_ANNOT_CREATE, "true")
-                .addString(VariantsAnnotLoad.SKIP_ANNOT_LOAD, "true")
-                .toJobParameters();
+        pipelineOptions.put("input", input);
+        pipelineOptions.put("outputDir", outputDir);
+        pipelineOptions.put(VariantsLoad.SKIP_LOAD, false);
+        pipelineOptions.put(VariantsStatsLoad.SKIP_STATS_LOAD, false);
+        variantOptions.put(VariantStorageManager.DB_NAME, dbName);
+        variantOptions.put(VariantStorageManager.VARIANT_SOURCE, source);
 
-        JobExecution execution = jobLauncher.run(job, parameters);
+        JobExecution execution = jobLauncher.run(job, getJobParameters());
 
-        assertEquals(input, execution.getJobParameters().getString("input"));
+        assertEquals(input, pipelineOptions.getString("input"));
         assertEquals(ExitStatus.FAILED.getExitCode(), execution.getExitStatus().getExitCode());
     }
 
@@ -185,6 +161,15 @@ public class VariantStatsConfigurationTest {
         cleanDBs();
         fillDB();
     }
+
+    @Before
+    public void setUp() throws Exception {
+        //re-initialize common config before each test
+        variantJobsArgs.loadArgs();
+        pipelineOptions = variantJobsArgs.getPipelineOptions();
+        variantOptions = variantJobsArgs.getVariantOptions();
+    }
+
 
     @AfterClass
     public static void afterTests() throws UnknownHostException {
