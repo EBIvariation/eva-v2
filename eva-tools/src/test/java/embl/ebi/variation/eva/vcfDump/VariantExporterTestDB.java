@@ -34,14 +34,15 @@ import java.util.List;
  * Created by pagarcia on 31/05/2016.
  */
 public class VariantExporterTestDB {
-    public static final String DB_NAME = "VariantExporterTest";
+    public static final String TEST_DB_NAME = "VariantExporterTest";
+    public static final String COW_TEST_DB_NAME = "eva_btaurus_umd31";
 
     private static final Logger logger = LoggerFactory.getLogger(VariantExporterTestDB.class);
 
     public static void cleanDBs() throws UnknownHostException {
         logger.info("Cleaning test DBs ...");
         MongoClient mongoClient = new MongoClient("localhost");
-        List<String> dbs = Arrays.asList(DB_NAME);
+        List<String> dbs = Arrays.asList(TEST_DB_NAME, COW_TEST_DB_NAME);
         for (String dbName : dbs) {
             DB db = mongoClient.getDB(dbName);
             db.dropDatabase();
@@ -50,9 +51,9 @@ public class VariantExporterTestDB {
     }
 
     public static void fillDB() throws IOException, InterruptedException {
-        String dump = VariantExporterTest.class.getResource("/dump/").getFile();
-        logger.info("restoring DB from " + dump);
-        Process exec = Runtime.getRuntime().exec("mongorestore " + dump);
+        String testDumpDirectory = VariantExporterTest.class.getResource("/dump/").getFile();
+        logger.info("restoring DB from " + testDumpDirectory);
+        Process exec = Runtime.getRuntime().exec("mongorestore " + testDumpDirectory);
         exec.waitFor();
         String line;
         BufferedReader bufferedReader = new BufferedReader(new InputStreamReader(exec.getInputStream()));

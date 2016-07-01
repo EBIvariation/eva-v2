@@ -19,9 +19,7 @@ import embl.ebi.variation.eva.vcfdump.cellbasewsclient.CellbaseWSClient;
 import htsjdk.tribble.FeatureCodecHeader;
 import htsjdk.tribble.readers.LineIterator;
 import htsjdk.variant.variantcontext.*;
-import htsjdk.variant.vcf.VCFCodec;
-import htsjdk.variant.vcf.VCFFilterHeaderLine;
-import htsjdk.variant.vcf.VCFHeader;
+import htsjdk.variant.vcf.*;
 import org.opencb.biodata.models.feature.Region;
 import org.opencb.biodata.models.variant.Variant;
 import org.opencb.biodata.models.variant.VariantSource;
@@ -68,6 +66,7 @@ public class VariantExporter {
     }
 
     public Map<String, List<VariantContext>> export(VariantDBIterator iterator, Region region, List<String> studyIds) {
+        // TODO: To be replaced by List<VariantContext>, because the variants wont be splitted by study
         Map<String, List<VariantContext>> variantsToExportByStudy = new HashMap<>();
         failedVariants = 0;
 
@@ -78,7 +77,9 @@ public class VariantExporter {
             Variant variant = iterator.next();
             if (region.contains(variant.getChromosome(), variant.getStart())) {
                 try {
+                    // TODO: this call should be replaced by a call to BiodataVariantToVariantContextConverter
                     Map<String, VariantContext> variantContexts = convertBiodataVariantToVariantContext(variant, studyIds, region);
+                    // TODO: we will get just one variantContest from BiodataVariantToVariantContextConverter
                     for (Map.Entry<String, VariantContext> variantContext : variantContexts.entrySet()) {
                         variantsToExportByStudy.putIfAbsent(variantContext.getKey(), new ArrayList<>());
                         variantsToExportByStudy.get(variantContext.getKey()).add(variantContext.getValue());
@@ -127,7 +128,6 @@ public class VariantExporter {
         }
 
         return headers;
-        //TODO: allow specify which samples to return
 /*
 //
 //        header.addMetaDataLine(new VCFFilterHeaderLine(".", "No FILTER info"));
@@ -157,6 +157,14 @@ public class VariantExporter {
 
     }
 
+    public VCFHeader getMergedVCFHeader(Map<String, VariantSource> sources) throws IOException {
+        Map<String, VCFHeader> headers = getVcfHeaders(sources);
+
+        Set<VCFHeaderLine> mergedHeaderLines = VCFUtils.smartMergeHeaders(headers.values(), true);
+        // TODO: update sample names if there is conflict: the code is in BiodataVariantToVariantContextConverter and should be moved here
+        return new VCFHeader(mergedHeaderLines);
+    }
+
     public int getFailedVariants() {
         return failedVariants;
     }
@@ -178,6 +186,7 @@ public class VariantExporter {
      * @param variant
      * @return
      */
+    @Deprecated
     public Map<String, VariantContext> convertBiodataVariantToVariantContext(
             Variant variant, List<String> studyIds, Region region) throws IOException {
         int missingGenotypes = 0;
