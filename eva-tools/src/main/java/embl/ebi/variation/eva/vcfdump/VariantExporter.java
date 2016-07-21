@@ -34,6 +34,7 @@ import org.slf4j.LoggerFactory;
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.util.*;
+import java.util.stream.Collectors;
 
 /**
  * Created by jmmut on 2015-10-28.
@@ -51,6 +52,7 @@ public class VariantExporter {
      */
     private int failedVariants;
     private String regionSequence;
+    private Map<String, Map<String, String>> studiesSampleNamesMapping;
 
     /**
      * if the variants will have empty alleles (such as normalized deletions: "A" to "") CellBase is mandatory to
@@ -101,6 +103,31 @@ public class VariantExporter {
             sources.put(variantSource.getStudyId(), variantSource);
         }
         return sources;
+    }
+
+    public boolean checkIfConflictsInSampleNames(Collection<VariantSource> sources) {
+        boolean conflict;
+        if (sources.size() == 1) {
+            conflict = false;
+        } else {
+            // if there are several studies, concatenate all sample names in one list and check if there are duplicate elements
+            List<String> allSampleNames = sources.stream().map(VariantSource::getSamples).flatMap(l -> l.stream()).collect(Collectors.toList());
+            conflict = allSampleNames.stream().anyMatch(s -> Collections.frequency(allSampleNames, s) > 1);
+            if (conflict) {
+                createSampleNamesMapping(sources);
+            }
+        }
+        return conflict;
+    }
+
+    private void createSampleNamesMapping(Collection<VariantSource> sources) {
+        // create a map from original to "conflict free" sample name (prefixing with study id)
+        studiesSampleNamesMapping = new HashMap<>();
+        for (VariantSource source : sources) {
+            Map<String, String> studySampleNamesMapping = new HashMap<>();
+            source.getSamples().stream().forEach(name -> studySampleNamesMapping.put(name, source.getStudyId() + "_" + name));
+            studiesSampleNamesMapping.put(source.getStudyId(), studySampleNamesMapping);
+        }
     }
 
     /**

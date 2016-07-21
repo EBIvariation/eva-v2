@@ -46,6 +46,7 @@ import java.net.UnknownHostException;
 import java.util.*;
 
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
 
 /**
@@ -65,6 +66,12 @@ public class VariantExporterTest {
     private static VariantSourceDBAdaptor variantSourceDBAdaptor;
     private static VariantDBAdaptor cowVariantDBAdaptor;
     private static VariantSourceDBAdaptor cowVariantSourceDBAdaptor;
+    private static ArrayList<String> s1s6SampleList;
+    private static ArrayList<String> s2s3SampleList;
+    private static ArrayList<String> c1c6SampleList;
+    private static final String STUDY_1 = "study_1";
+    private static final String STUDY_2 = "study_2";
+    private static final String STUDY_3 = "study_3";
 
     /**
      * Clears and populates the Mongo collection used during the tests.
@@ -85,6 +92,20 @@ public class VariantExporterTest {
         variantSourceDBAdaptor = variantDBAdaptor.getVariantSourceDBAdaptor();
         cowVariantDBAdaptor = variantStorageManager.getDBAdaptor(VariantExporterTestDB.COW_TEST_DB_NAME, null);
         cowVariantSourceDBAdaptor = cowVariantDBAdaptor.getVariantSourceDBAdaptor();
+
+        // example samples list
+        s1s6SampleList = new ArrayList<>();
+        for (int i = 1; i <= 6; i++) {
+            s1s6SampleList.add("s" + i);
+        }
+        s2s3SampleList = new ArrayList<>();
+        for (int i = 2; i <= 4; i++) {
+            s2s3SampleList.add("s" + i);
+        }
+        c1c6SampleList = new ArrayList<>();
+        for (int i = 1; i <= 6; i++) {
+            c1c6SampleList.add("c" + i);
+        }
     }
 
     /**
@@ -133,6 +154,27 @@ public class VariantExporterTest {
         studies = new ArrayList<>();
         sources = variantExporter.getSources(variantSourceDBAdaptor, studies);
         assertEquals(0, sources.size());
+    }
+
+    @Test
+    public void checkSampleNamesConflicts() {
+        VariantSource variantSource = createTestVariantSource(STUDY_1, s1s6SampleList);
+        VariantSource variantSource2 = createTestVariantSource(STUDY_2, c1c6SampleList);
+        VariantSource variantSource3 = createTestVariantSource(STUDY_3, s2s3SampleList);
+
+        VariantExporter variantExporter = new VariantExporter(null);
+
+        // sutdy 1 and 2 don't share sample names
+        assertFalse(variantExporter.checkIfConflictsInSampleNames((Arrays.asList(variantSource, variantSource2))));
+
+        // sutdy 2 and 3 don't share sample names
+        assertFalse(variantExporter.checkIfConflictsInSampleNames((Arrays.asList(variantSource2, variantSource3))));
+
+        // sutdy 1 and 3 share sample some names
+        assertTrue(variantExporter.checkIfConflictsInSampleNames((Arrays.asList(variantSource, variantSource3))));
+
+        // sutdy 1 and 3 (but not 2) share sample some names
+        assertTrue(variantExporter.checkIfConflictsInSampleNames((Arrays.asList(variantSource, variantSource2, variantSource3))));
     }
 
     @Test
@@ -375,5 +417,11 @@ public class VariantExporterTest {
             }
         }
         return false;
+    }
+
+    private VariantSource createTestVariantSource(String studyId, List<String> sampleList) {
+        final VariantSource variantSource = new VariantSource("name", "fileId", studyId, "studyName");
+        variantSource.setSamples(sampleList);
+        return variantSource;
     }
 }

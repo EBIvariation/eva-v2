@@ -44,12 +44,10 @@ public class BiodataVariantToVariantContextConverterTest {
     private static VariantFactory variantFactory;
     private static final String CHR_1 = "1";
     private static final String STUDY_1 = "study_1";
-    private static final String STUDY_2 = "study_2";
-    private static final String STUDY_3 = "study_3";
-    private static CellbaseWSClient cellbaseWSClientStub;
     private static ArrayList<String> s1s6SampleList;
-    private static ArrayList<String> s2s3SampleList;
-    private static ArrayList<String> c1c6SampleList;
+    private static CellbaseWSClient cellbaseWSClientStub;
+    private static Map<String, Map<String, String>> noSampleNamesConflictSampleNameCorrections = null;
+
 
     @BeforeClass
     public static void setUpBeforeClass() throws Exception {
@@ -74,43 +72,12 @@ public class BiodataVariantToVariantContextConverterTest {
         for (int i = 1; i <= 6; i++) {
             s1s6SampleList.add("s" + i);
         }
-        s2s3SampleList = new ArrayList<>();
-        for (int i = 2; i <= 4; i++) {
-            s2s3SampleList.add("s" + i);
-        }
-        c1c6SampleList = new ArrayList<>();
-        for (int i = 1; i <= 6; i++) {
-            c1c6SampleList.add("c" + i);
-        }
+
     }
 
     @After
     public void tearDown() throws Exception {
 
-    }
-
-    @Test
-    public void checkSampleNamesConflicts() {
-        VariantSource variantSource = createTestVariantSource(STUDY_1, s1s6SampleList);
-        VariantSource variantSource2 = createTestVariantSource(STUDY_2, c1c6SampleList);
-        VariantSource variantSource3 = createTestVariantSource(STUDY_3, s2s3SampleList);
-
-        // sutdy 1 and 2 don't share sample names
-        BiodataVariantToVariantContextConverter variantConverter =
-                new BiodataVariantToVariantContextConverter(Arrays.asList(variantSource, variantSource2), null);
-        assertFalse(variantConverter.checkIfConflictsInSampleNames());
-
-        // sutdy 2 and 3 don't share sample names
-        variantConverter = new BiodataVariantToVariantContextConverter(Arrays.asList(variantSource2, variantSource3), null);
-        assertFalse(variantConverter.checkIfConflictsInSampleNames());
-
-        // sutdy 1 and 3 share sample some names
-        variantConverter = new BiodataVariantToVariantContextConverter(Arrays.asList(variantSource, variantSource3), null);
-        assertTrue(variantConverter.checkIfConflictsInSampleNames());
-
-        // sutdy 1 and 3 (but not 2) share sample some names
-        variantConverter = new BiodataVariantToVariantContextConverter(Arrays.asList(variantSource, variantSource2, variantSource3), null);
-        assertTrue(variantConverter.checkIfConflictsInSampleNames());
     }
 
     @Test
@@ -124,7 +91,7 @@ public class BiodataVariantToVariantContextConverterTest {
         // export variant
         // TODO: cellbaseClient and region are null because we don't need them. Change API?
         BiodataVariantToVariantContextConverter variantConverter =
-                new BiodataVariantToVariantContextConverter(Collections.singletonList(variantSource), null);
+                new BiodataVariantToVariantContextConverter(Collections.singletonList(variantSource), null, noSampleNamesConflictSampleNameCorrections);
         VariantContext variantContext = variantConverter.transform(variants.get(0), null);
         checkVariantContext(variantContext, CHR_1, 1000, 1000, "C", "A", new HashSet<>(s1s6SampleList));
     }
@@ -139,7 +106,7 @@ public class BiodataVariantToVariantContextConverterTest {
 
         // export variant
         BiodataVariantToVariantContextConverter variantConverter =
-                new BiodataVariantToVariantContextConverter(Collections.singletonList(variantSource), cellbaseWSClientStub);
+                new BiodataVariantToVariantContextConverter(Collections.singletonList(variantSource), cellbaseWSClientStub, noSampleNamesConflictSampleNameCorrections);
         // TODO: test with region
         VariantContext variantContext = variantConverter.transform(variants.get(0), null);
         checkVariantContext(variantContext, CHR_1, 1100, 1100, "T", "TG", new HashSet<>(s1s6SampleList));
@@ -155,7 +122,7 @@ public class BiodataVariantToVariantContextConverterTest {
 
         // export variant
         BiodataVariantToVariantContextConverter variantConverter =
-                new BiodataVariantToVariantContextConverter(Collections.singletonList(variantSource), cellbaseWSClientStub);
+                new BiodataVariantToVariantContextConverter(Collections.singletonList(variantSource), cellbaseWSClientStub, noSampleNamesConflictSampleNameCorrections);
         // TODO: test with region
         VariantContext variantContext = variantConverter.transform(variants.get(0), null);
         checkVariantContext(variantContext, CHR_1, 1100, 1101, "TA", "T", new HashSet<>(s1s6SampleList));
@@ -171,7 +138,7 @@ public class BiodataVariantToVariantContextConverterTest {
 
         // export variant
         BiodataVariantToVariantContextConverter variantConverter =
-                new BiodataVariantToVariantContextConverter(Collections.singletonList(variantSource), cellbaseWSClientStub);
+                new BiodataVariantToVariantContextConverter(Collections.singletonList(variantSource), cellbaseWSClientStub, noSampleNamesConflictSampleNameCorrections);
         // TODO: test with region
         VariantContext variantContext = variantConverter.transform(variants.get(0), new Region("1", 1090, 1110));
         checkVariantContext(variantContext, CHR_1, 1100, 1100, "T", "TG", new HashSet<>(s1s6SampleList));
@@ -187,7 +154,7 @@ public class BiodataVariantToVariantContextConverterTest {
 
         // export variant
         BiodataVariantToVariantContextConverter variantConverter =
-                new BiodataVariantToVariantContextConverter(Collections.singletonList(variantSource), cellbaseWSClientStub);
+                new BiodataVariantToVariantContextConverter(Collections.singletonList(variantSource), cellbaseWSClientStub, noSampleNamesConflictSampleNameCorrections);
         // TODO: test with region
         VariantContext variantContext = variantConverter.transform(variants.get(0),new Region("1", 1090, 1110));
         checkVariantContext(variantContext, CHR_1, 1100, 1101, "TA", "T", new HashSet<>(s1s6SampleList));
@@ -203,7 +170,7 @@ public class BiodataVariantToVariantContextConverterTest {
 
         // export variant
         BiodataVariantToVariantContextConverter variantConverter =
-                new BiodataVariantToVariantContextConverter(Collections.singletonList(variantSource), null);
+                new BiodataVariantToVariantContextConverter(Collections.singletonList(variantSource), null, noSampleNamesConflictSampleNameCorrections);
         // should thrown IllegalArgumentException:
         variantConverter.transform(variants.get(0), null);
         // TODO: assertions
@@ -219,7 +186,7 @@ public class BiodataVariantToVariantContextConverterTest {
 
         // export variant
         BiodataVariantToVariantContextConverter variantConverter =
-                new BiodataVariantToVariantContextConverter(Collections.singletonList(variantSource), cellbaseWSClientStub);
+                new BiodataVariantToVariantContextConverter(Collections.singletonList(variantSource), cellbaseWSClientStub, noSampleNamesConflictSampleNameCorrections);
         VariantContext variant1Context = variantConverter.transform(variants.get(0), null);
         VariantContext variant2Context = variantConverter.transform(variants.get(1), null);
 
@@ -254,7 +221,7 @@ public class BiodataVariantToVariantContextConverterTest {
         variant.addSourceEntry(study2Entry);
 
         // transform variant
-        BiodataVariantToVariantContextConverter variantConverter = new BiodataVariantToVariantContextConverter(Arrays.asList(source1, source2), cellbaseWSClientStub);
+        BiodataVariantToVariantContextConverter variantConverter = new BiodataVariantToVariantContextConverter(Arrays.asList(source1, source2), cellbaseWSClientStub, noSampleNamesConflictSampleNameCorrections);
         VariantContext variantContext = variantConverter.transform(variant, null);
 
         // check transformed variant
@@ -268,28 +235,55 @@ public class BiodataVariantToVariantContextConverterTest {
         // create test variant, with two studies and samples with not conflicting names
         Variant variant = new Variant(CHR_1, 1000, 1000, "T", "G");
 
-        VariantSource source1 = new VariantSource("testFile1", "file_1", "study_1", "testStudy1");
-        source1.setSamples(Arrays.asList("SX_1", "SX_2", "SX_3", "SX_4"));
-        VariantSourceEntry study1Entry = new VariantSourceEntry("file_1", "study_1");
-        addGenotype(study1Entry, "SX_1", "0|0");
-        addGenotype(study1Entry, "SX_2", "0|1");
-        addGenotype(study1Entry, "SX_3", "0|1");
-        addGenotype(study1Entry, "SX_4", "0|0");
-        variant.addSourceEntry(study1Entry);
+        // studies and samples names
+        String study1 = "study_1";
+        String study2 = "study_2";
+        String sampleX1 = "SX_1";
+        String sampleX2 = "SX_2";
+        String sampleX3 = "SX_3";
+        String sampleX4 = "SX_4";
+        String sampleX5 = "SX_5";
+        String sampleX6 = "SX_6";
 
-        VariantSource source2 = new VariantSource("testFile2", "file_2", "study_2", "testStudy2");
-        source2.setSamples(Arrays.asList("SX_1", "SX_2", "SX_3", "SX_4", "SX_5", "SX_6"));
-        VariantSourceEntry study2Entry = new VariantSourceEntry("file_2", "study_2");
-        addGenotype(study2Entry, "SX_1", "0|0");
-        addGenotype(study2Entry, "SX_2", "1|0");
-        addGenotype(study2Entry, "SX_3", "1|1");
-        addGenotype(study2Entry, "SX_4", "1|1");
-        addGenotype(study2Entry, "SX_5", "0|0");
-        addGenotype(study2Entry, "SX_6", "1|0");
+        // sample name corrections map (usually created by VariantExporter)
+        Map<String, Map<String, String>> sampleNamesCorrections = new HashMap<>();
+        Map<String, String> study1SampleNameCorrections = new HashMap<>();
+        study1SampleNameCorrections.put(sampleX1, study1 + "_" + sampleX1);
+        study1SampleNameCorrections.put(sampleX2, study1 + "_" + sampleX2);
+        study1SampleNameCorrections.put(sampleX3, study1 + "_" + sampleX3);
+        study1SampleNameCorrections.put(sampleX4, study1 + "_" + sampleX4);
+        sampleNamesCorrections.put(study1, study1SampleNameCorrections);
+        Map<String, String> study2SampleNameCorrections = new HashMap<>();
+        study2SampleNameCorrections.put(sampleX1, study2 + "_" + sampleX1);
+        study2SampleNameCorrections.put(sampleX2, study2 + "_" + sampleX2);
+        study2SampleNameCorrections.put(sampleX3, study2 + "_" + sampleX3);
+        study2SampleNameCorrections.put(sampleX4, study2 + "_" + sampleX4);
+        study2SampleNameCorrections.put(sampleX5, study2 + "_" + sampleX5);
+        study2SampleNameCorrections.put(sampleX6, study2 + "_" + sampleX6);
+        sampleNamesCorrections.put(study2, study2SampleNameCorrections);
+
+        // variant sources
+        VariantSource source1 = new VariantSource("testFile1", "file_1", study1, "testStudy1");
+        source1.setSamples(Arrays.asList(sampleX1, sampleX2, sampleX3, sampleX4));
+        VariantSourceEntry study1Entry = new VariantSourceEntry("file_1", study1);
+        addGenotype(study1Entry, sampleX1, "0|0");
+        addGenotype(study1Entry, sampleX2, "0|1");
+        addGenotype(study1Entry, sampleX3, "0|1");
+        addGenotype(study1Entry, sampleX4, "0|0");
+        variant.addSourceEntry(study1Entry);
+        VariantSource source2 = new VariantSource("testFile2", "file_2", study2, "testStudy2");
+        source2.setSamples(Arrays.asList(sampleX1, sampleX2, sampleX3, sampleX4, sampleX5, sampleX6));
+        VariantSourceEntry study2Entry = new VariantSourceEntry("file_2", study2);
+        addGenotype(study2Entry, sampleX1, "0|0");
+        addGenotype(study2Entry, sampleX2, "1|0");
+        addGenotype(study2Entry, sampleX3, "1|1");
+        addGenotype(study2Entry, sampleX4, "1|1");
+        addGenotype(study2Entry, sampleX5, "0|0");
+        addGenotype(study2Entry, sampleX6, "1|0");
         variant.addSourceEntry(study2Entry);
 
         // transform variant
-        BiodataVariantToVariantContextConverter variantConverter = new BiodataVariantToVariantContextConverter(Arrays.asList(source1, source2), cellbaseWSClientStub);
+        BiodataVariantToVariantContextConverter variantConverter = new BiodataVariantToVariantContextConverter(Arrays.asList(source1, source2), cellbaseWSClientStub, sampleNamesCorrections);
         VariantContext variantContext = variantConverter.transform(variant, null);
 
         // check transformed variant
@@ -359,7 +353,6 @@ public class BiodataVariantToVariantContextConverterTest {
 //        assertEquals(100, variantContext.getPhredScaledQual(), 0);
         assertEquals(Collections.singleton(BiodataVariantToVariantContextConverter.FILTER_PASS), variantContext.getFilters());
         assertEquals(0, variantContext.getCommonInfo().getAttributes().size());
-        // TODO: sample names in other place, or add the parameter
         assertEquals(sampleNames, variantContext.getSampleNames());
         // TODO check genotypes. use assertEqualGenotypes?
         // TODO: move outside?

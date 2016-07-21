@@ -42,10 +42,9 @@ public class BiodataVariantToVariantContextConverter {
 
     private final VariantContextBuilder variantContextBuilder;
     private final List<VariantSource> sources;
-    private boolean conflictsInStudyNames;
     private CellbaseWSClient cellbaseClient;
     private String regionSequence;
-    private Map<String, Map<String,String>> studiesSampleNamesMapping;
+    private Map<String, Map<String,String>> studiesSampleNamesEquivalences;
 
     // TODO: use a different value?
     public static final double UNKNOWN_QUAL = -10;
@@ -53,38 +52,13 @@ public class BiodataVariantToVariantContextConverter {
     // TODO: check if there is a PASS constant in any of the libraries
     public static final String FILTER_PASS = "PASS";
 
-    public BiodataVariantToVariantContextConverter(List<VariantSource> sources, CellbaseWSClient cellbaseWSClient) {
+    public BiodataVariantToVariantContextConverter(List<VariantSource> sources, CellbaseWSClient cellbaseWSClient,
+                                                   Map<String, Map<String,String>> studiesSampleNamesEquivalences)
+    {
         this.sources = sources;
         this.cellbaseClient = cellbaseWSClient;
+        this.studiesSampleNamesEquivalences = studiesSampleNamesEquivalences;
         variantContextBuilder = new VariantContextBuilder();
-        conflictsInStudyNames = checkIfConflictsInSampleNames();
-    }
-
-    // TODO: this method should be moved to VariantExporter, because we probably need to change the sample names in the header also
-    public boolean checkIfConflictsInSampleNames() {
-        boolean conflict;
-        if (sources.size() == 1) {
-            conflict = false;
-        } else {
-            // if there are several studies, concatenate all sample names in one list and check if there are duplicate elements
-            List<String> allSampleNames = sources.stream().map(VariantSource::getSamples).flatMap(l -> l.stream()).collect(Collectors.toList());
-            conflict = allSampleNames.stream().anyMatch(s -> Collections.frequency(allSampleNames, s) > 1);
-            if (conflict) {
-                createSampleNamesMapping();
-            }
-        }
-        return conflict;
-    }
-
-    // TODO: to be moved to VariantExporter too
-    private void createSampleNamesMapping() {
-        // create a map from original to "conflict free" sample name (prefixing with study id)
-        studiesSampleNamesMapping = new HashMap<>();
-        for (VariantSource source : sources) {
-            Map<String, String> studySampleNamesMapping = new HashMap<>();
-            source.getSamples().stream().forEach(name -> studySampleNamesMapping.put(name, source.getStudyId() + "_" + name));
-            studiesSampleNamesMapping.put(source.getStudyId(), studySampleNamesMapping);
-        }
     }
 
     public VariantContext transform(Variant variant, Region region) throws CellbaseSequenceDownloadError {
@@ -233,9 +207,9 @@ public class BiodataVariantToVariantContextConverter {
     }
 
     private String getFixedSampleName(String studyId, String sampleName) {
-        // this method returns the "study if appended" sample name if there are sample name conflicts
-        if (conflictsInStudyNames) {
-            return studiesSampleNamesMapping.get(studyId).get(sampleName);
+        // this method returns the "studyId appended" sample name if there are sample name conflicts
+        if (studiesSampleNamesEquivalences != null) {
+            return studiesSampleNamesEquivalences.get(studyId).get(sampleName);
         } else {
             return sampleName;
         }
