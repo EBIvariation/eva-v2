@@ -292,6 +292,8 @@ public class BiodataVariantToVariantContextConverterTest {
         checkVariantContext(variantContext, CHR_1, 1000, 1000, "T", "G", sampleNames);
     }
 
+    // TODO: test with alleles -1|-1
+
     private void addGenotype(VariantSourceEntry sourceEntry, String sampleName, String genotype) {
         Map<String, String> sampleData = new HashMap<>();
         sampleData.put("GT", genotype);
@@ -300,47 +302,47 @@ public class BiodataVariantToVariantContextConverterTest {
 
 
     // TODO: check if those test cases are already covered by the preceding tests, and remove if so (or create new test with the test cases not covered)
-    @Test(expected=IllegalArgumentException.class)
-    public void singleStudyVariantTransformMissingCellbase() throws Exception {
-        String studyId = "studyId";
-        final VariantSource variantSource = createTestVariantSource(studyId);
-
-        List<String> studies = Collections.singletonList(studyId);
-
-        // TODO: split the test into different ones
-        // test multiallelic. these first conversions should NOT fail, as they doesn't need the src
-        String multiallelicLine = "1\t1000\tid\tC\tA,T\t100\tPASS\t.\tGT\t0|0\t0|0\t0|1\t1|1\t1|2\t0|1";
-        List<Variant> variants = variantFactory.create(variantSource, multiallelicLine);
-        assertEquals(2, variants.size());
-        removeSrc(variants);    // <---- this is the key point of the test
-
-        VariantExporter variantExporter = new VariantExporter(null);
-        Map<String, VariantContext> variantContext = variantExporter.convertBiodataVariantToVariantContext(variants.get(0), studies, null);
-
-        List<String> alleles = Arrays.asList("C", "A", ".");
-        assertEqualGenotypes(variants.get(0), variantContext.get(studyId), alleles);
-
-        variantContext = variantExporter.convertBiodataVariantToVariantContext(variants.get(1), studies, null);
-        alleles = Arrays.asList("C", "T", ".");
-        assertEqualGenotypes(variants.get(1), variantContext.get(studyId), alleles);
-
-
-        // test multiallelic + indel
-        String multiallelicIndelLine = "1\t1000\tid\tC\tCA,T\t100\tPASS\t.\tGT\t0|0\t0|0\t0|1\t1|1\t1|2\t0|1";
-        variants = variantFactory.create(variantSource, multiallelicIndelLine);
-        assertEquals(2, variants.size());
-        removeSrc(variants);    // <---- this is the key point of the test
-
-        variantContext = variantExporter.convertBiodataVariantToVariantContext(variants.get(1), studies, null);
-        alleles = Arrays.asList("C", "T", ".");
-        assertEqualGenotypes(variants.get(1), variantContext.get(studyId), alleles);
-
-        // TODO: is the exception just thrown in the last line?
-        // the next exception is the only one that should throw
-//        thrown.expect(IllegalArgumentException.class);
-        variantExporter.convertBiodataVariantToVariantContext(variants.get(0), studies, null);
-
-    }
+//    @Test(expected=IllegalArgumentException.class)
+//    public void singleStudyVariantTransformMissingCellbase() throws Exception {
+//        String studyId = "studyId";
+//        final VariantSource variantSource = createTestVariantSource(studyId);
+//
+//        List<String> studies = Collections.singletonList(studyId);
+//
+//        // TODO: split the test into different ones
+//        // test multiallelic. these first conversions should NOT fail, as they doesn't need the src
+//        String multiallelicLine = "1\t1000\tid\tC\tA,T\t100\tPASS\t.\tGT\t0|0\t0|0\t0|1\t1|1\t1|2\t0|1";
+//        List<Variant> variants = variantFactory.create(variantSource, multiallelicLine);
+//        assertEquals(2, variants.size());
+//        removeSrc(variants);    // <---- this is the key point of the test
+//
+//        VariantExporter variantExporter = new VariantExporter(null);
+//        Map<String, VariantContext> variantContext = variantExporter.convertBiodataVariantToVariantContext(variants.get(0), studies, null);
+//
+//        List<String> alleles = Arrays.asList("C", "A", ".");
+//        assertEqualGenotypes(variants.get(0), variantContext.get(studyId), alleles);
+//
+//        variantContext = variantExporter.convertBiodataVariantToVariantContext(variants.get(1), studies, null);
+//        alleles = Arrays.asList("C", "T", ".");
+//        assertEqualGenotypes(variants.get(1), variantContext.get(studyId), alleles);
+//
+//
+//        // test multiallelic + indel
+//        String multiallelicIndelLine = "1\t1000\tid\tC\tCA,T\t100\tPASS\t.\tGT\t0|0\t0|0\t0|1\t1|1\t1|2\t0|1";
+//        variants = variantFactory.create(variantSource, multiallelicIndelLine);
+//        assertEquals(2, variants.size());
+//        removeSrc(variants);    // <---- this is the key point of the test
+//
+//        variantContext = variantExporter.convertBiodataVariantToVariantContext(variants.get(1), studies, null);
+//        alleles = Arrays.asList("C", "T", ".");
+//        assertEqualGenotypes(variants.get(1), variantContext.get(studyId), alleles);
+//
+//        // TODO: is the exception just thrown in the last line?
+//        // the next exception is the only one that should throw
+////        thrown.expect(IllegalArgumentException.class);
+//        variantExporter.convertBiodataVariantToVariantContext(variants.get(0), studies, null);
+//
+//    }
 
     private void checkVariantContext(VariantContext variantContext, String chromosome, int start, int end, String ref, String alt, Set<String> sampleNames) {
         assertEquals(chromosome, variantContext.getContig());

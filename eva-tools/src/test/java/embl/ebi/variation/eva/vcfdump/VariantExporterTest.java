@@ -18,7 +18,6 @@ package embl.ebi.variation.eva.vcfdump;
 import embl.ebi.variation.eva.vcfdump.cellbasewsclient.CellbaseWSClient;
 import htsjdk.variant.variantcontext.Allele;
 import htsjdk.variant.variantcontext.VariantContext;
-import htsjdk.variant.vcf.VCFContigHeaderLine;
 import htsjdk.variant.vcf.VCFHeader;
 import org.junit.AfterClass;
 import org.junit.BeforeClass;
@@ -28,7 +27,6 @@ import org.junit.rules.ExpectedException;
 import org.opencb.biodata.models.feature.Region;
 import org.opencb.biodata.models.variant.*;
 import org.opencb.datastore.core.QueryOptions;
-import org.opencb.opencga.lib.common.ArrayUtils;
 import org.opencb.opencga.lib.common.Config;
 import org.opencb.opencga.storage.core.StorageManagerException;
 import org.opencb.opencga.storage.core.StorageManagerFactory;
@@ -36,7 +34,6 @@ import org.opencb.opencga.storage.core.variant.VariantStorageManager;
 import org.opencb.opencga.storage.core.variant.adaptors.VariantDBAdaptor;
 import org.opencb.opencga.storage.core.variant.adaptors.VariantDBIterator;
 import org.opencb.opencga.storage.core.variant.adaptors.VariantSourceDBAdaptor;
-import org.opencb.opencga.storage.mongodb.variant.VariantMongoDBAdaptor;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -45,9 +42,7 @@ import java.net.URISyntaxException;
 import java.net.UnknownHostException;
 import java.util.*;
 
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertFalse;
-import static org.junit.Assert.assertTrue;
+import static org.junit.Assert.*;
 
 /**
  * Created by jmmut on 2015-10-29.
@@ -165,16 +160,22 @@ public class VariantExporterTest {
         VariantExporter variantExporter = new VariantExporter(null);
 
         // sutdy 1 and 2 don't share sample names
-        assertFalse(variantExporter.checkIfConflictsInSampleNames((Arrays.asList(variantSource, variantSource2))));
+        assertNull(variantExporter.checkIfConflictsInSampleNames((Arrays.asList(variantSource, variantSource2))));
 
         // sutdy 2 and 3 don't share sample names
-        assertFalse(variantExporter.checkIfConflictsInSampleNames((Arrays.asList(variantSource2, variantSource3))));
+        assertNull(variantExporter.checkIfConflictsInSampleNames((Arrays.asList(variantSource2, variantSource3))));
 
         // sutdy 1 and 3 share sample some names
-        assertTrue(variantExporter.checkIfConflictsInSampleNames((Arrays.asList(variantSource, variantSource3))));
+        Map<String, Map<String, String>> study1And3SampleNameTranslations = variantExporter.checkIfConflictsInSampleNames((Arrays.asList(variantSource, variantSource3)));
+        s1s6SampleList.forEach(sampleName -> study1And3SampleNameTranslations.get(STUDY_1).get(sampleName).equals(STUDY_1 + "_" + sampleName));
+        s2s3SampleList.forEach(sampleName -> study1And3SampleNameTranslations.get(STUDY_3).get(sampleName).equals(STUDY_3 + "_" + sampleName));
+
 
         // sutdy 1 and 3 (but not 2) share sample some names
-        assertTrue(variantExporter.checkIfConflictsInSampleNames((Arrays.asList(variantSource, variantSource2, variantSource3))));
+        Map<String, Map<String, String>> study1And2And3SampleNameTranslations = variantExporter.checkIfConflictsInSampleNames((Arrays.asList(variantSource, variantSource2, variantSource3)));
+        s1s6SampleList.forEach(sampleName -> study1And2And3SampleNameTranslations.get(STUDY_1).get(sampleName).equals(STUDY_1 + "_" + sampleName));
+        c1c6SampleList.forEach(sampleName -> study1And2And3SampleNameTranslations.get(STUDY_2).get(sampleName).equals(STUDY_2 + "_" + sampleName));
+        s2s3SampleList.forEach(sampleName -> study1And2And3SampleNameTranslations.get(STUDY_3).get(sampleName).equals(STUDY_3 + "_" + sampleName));
     }
 
     @Test
@@ -212,8 +213,8 @@ public class VariantExporterTest {
         List<String> studies = Collections.singletonList("7");
         String region = "20:61000-69000";
         QueryOptions query = new QueryOptions();
-        Map<String, List<VariantContext>> exportedVariants = exportAndCheck(variantDBAdaptor, query, studies, region);
-        checkExportedVariants(variantDBAdaptor, query, studies, exportedVariants);
+        List<VariantContext> exportedVariants = exportAndCheck(variantSourceDBAdaptor, variantDBAdaptor, query, studies, region);
+        checkExportedVariants(variantDBAdaptor, query, exportedVariants);
     }
 
     @Test
@@ -221,21 +222,21 @@ public class VariantExporterTest {
         List<String> studies = Arrays.asList("PRJEB6119", "PRJEB7061");
         String region = "21:820000-830000";
         QueryOptions query = new QueryOptions();
-        Map<String, List<VariantContext>> exportedVariants = exportAndCheck(cowVariantDBAdaptor, query, studies, region);
-        checkExportedVariants(cowVariantDBAdaptor, query, studies, exportedVariants);
+        List<VariantContext> exportedVariants = exportAndCheck(cowVariantSourceDBAdaptor, cowVariantDBAdaptor, query, studies, region);
+        checkExportedVariants(cowVariantDBAdaptor, query, exportedVariants);
     }
 
-    // TODO: review this test
+    // TODO: this test is not going to work as expected because ID and Region are an OR filter. Add annotation data to the test data
+    //       and write a test filtering by annotation
 //    @Test
 //    public void textExportWithFilter() {
-//        QueryOptions queryOptions = new QueryOptions();
-//        // TODO: this test should fail, is not exporting all variants
-//        queryOptions.put(VariantDBAdaptor.ID, "rs544625796");
- //      //     query.put(VariantDBAdaptor.REFERENCE, "A");
+//        QueryOptions query = new QueryOptions();
+//        query.put(VariantDBAdaptor.ID, "rs544625796");
+//       //     query.put(VariantDBAdaptor.REFERENCE, "A");
 //        List<String> studies = Collections.singletonList("7");
 //        String region = "20:61000-69000";
-//        eMap<String, List<VariantContext>> exportedVariants = xportAndCheck(queryOptions, studies, region);
-//        checkExportedVariants
+//        Map<String, List<VariantContext>> exportedVariants = exportAndCheck(variantDBAdaptor, query, studies, region);
+//        checkExportedVariants(variantDBAdaptor, query, studies, exportedVariants);
 //                // annot-ct=SO%3A0001583
 //
 //    }
@@ -330,39 +331,41 @@ public class VariantExporterTest {
 //    }
 
 
-    private Map<String, List<VariantContext>> exportAndCheck(VariantDBAdaptor variantDBAdaptor, QueryOptions query, List<String> studies, String region) {
+    private List<VariantContext> exportAndCheck(VariantSourceDBAdaptor variantSourceDBAdaptor, VariantDBAdaptor variantDBAdaptor, QueryOptions query, List<String> studies, String region) {
         VariantExporter variantExporter = new VariantExporter(cellBaseClient);
         query.put(VariantDBAdaptor.STUDIES, studies);
         query.add(VariantDBAdaptor.REGION, region);
 
         VariantDBIterator iterator = variantDBAdaptor.iterator(query);
-        Map<String, List<VariantContext>> exportedVariants = variantExporter.export(iterator, new Region(region), studies);
+
+        // we need to call 'getSources' before 'export' because it check if there are sample name conflicts and initialize some dependencies
+        variantExporter.getSources(variantSourceDBAdaptor, studies);
+        List<VariantContext> exportedVariants = variantExporter.export(iterator, new Region(region));
+
         assertEquals(0, variantExporter.getFailedVariants());
+
         return exportedVariants;
     }
 
-    private void checkExportedVariants(VariantDBAdaptor variantDBAdaptor, QueryOptions query, List<String> studies, Map<String, List<VariantContext>> exportedVariants) {
-        // checks
-        assertEquals(studies.size(), exportedVariants.keySet().size());
-
-        for (String study : studies) {
-            compareExportedVariantsWithDatabaseOnes(variantDBAdaptor, query, exportedVariants, study);
-        }
+    private void checkExportedVariants(VariantDBAdaptor variantDBAdaptor, QueryOptions query, List<VariantContext> exportedVariants) {
+//        for (String study : studies) {
+            compareExportedVariantsWithDatabaseOnes(variantDBAdaptor, query, exportedVariants);
+//        }
     }
 
-    private void compareExportedVariantsWithDatabaseOnes(VariantDBAdaptor variantDBAdaptor, QueryOptions query, Map<String, List<VariantContext>> exportedVariants, String study) {
+    private void compareExportedVariantsWithDatabaseOnes(VariantDBAdaptor variantDBAdaptor, QueryOptions query, List<VariantContext> exportedVariants) {
         VariantDBIterator iterator;
-        query.put(VariantDBAdaptor.STUDIES, Collections.singletonList(study));
+//        query.put(VariantDBAdaptor.STUDIES, Collections.singletonList(study));
         long iteratorSize = 0;
         iterator = variantDBAdaptor.iterator(query);
         while (iterator.hasNext()) {
             Variant variant = iterator.next();
-            assertTrue(variantInExportedVariantsCollection(variant, exportedVariants.get(study)));
+            assertTrue(variantInExportedVariantsCollection(variant, exportedVariants));
             iteratorSize++;
         }
-        int studyExportedVariants = exportedVariants.get(study).size();
-        logger.info("{} variants exported for study {}", studyExportedVariants, study);
-        assertEquals(iteratorSize, studyExportedVariants);
+//        int studyExportedVariants = exportedVariants.get(study).size();
+//        logger.info("{} variants exported for study {}", studyExportedVariants, study);
+        assertEquals(iteratorSize, exportedVariants.size());
     }
 
 //    private VariantSource createTestVariantSource(String studyId) {

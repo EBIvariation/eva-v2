@@ -42,6 +42,7 @@ import java.io.IOException;
 import java.net.URISyntaxException;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.time.LocalDateTime;
 import java.util.*;
 import java.util.stream.Collectors;
 
@@ -56,6 +57,7 @@ public class VariantExporterController {
     private static final int WINDOW_SIZE = 20000;
 
     private final CellbaseWSClient cellBaseClient;
+    private final String species;
     private final List<String> studies;
     private final List<String> files;
     private final String outputDir;
@@ -65,13 +67,14 @@ public class VariantExporterController {
    // private final RegionDivider regionDivider;
     private final RegionFactory regionFactory;
     private final VariantExporter exporter;
-    private Map<String, String> outputFilePaths;
+    private Path outputFilePath;
     private int failedVariants;
 
     public VariantExporterController(String species, String dbName, List<String> studies, List<String> files,
                                      String outputDir, MultivaluedMap<String, String> queryParameters)
             throws IllegalAccessException, ClassNotFoundException, InstantiationException, StorageManagerException, URISyntaxException {
         checkParams(species, studies, outputDir, dbName);
+        this.species = species;
         this.studies = studies;
         this.files = files;
         this.outputDir = outputDir;
@@ -116,55 +119,63 @@ public class VariantExporterController {
         return query;
     }
 
+//    public void run() {
+//        Map<String, VCFHeader> headers = getVcfHeaders();
+//        if (headers != null) {
+//            Map<String, VariantContextWriter> writers = getWriters(headers);
+//            writers.forEach((study, writer) -> writer.writeHeader(headers.get(study)));
+//
+//            // get all chromosomes in the query or organism, and export the variants for each chromosome
+//            Set<String> chromosomes = getChromosomes(headers, studies, query);
+//            for (String chromosome : chromosomes) {
+//                exportChromosomeVariants(writers, chromosome);
+//            }
+//
+//            writers.values().forEach(VariantContextWriter::close);
+//        }
+//    }
+
     public void run() {
-        Map<String, VCFHeader> headers = getVcfHeaders();
-        if (headers != null) {
-            Map<String, VariantContextWriter> writers = getWriters(headers);
-            writers.forEach((study, writer) -> writer.writeHeader(headers.get(study)));
+        VCFHeader header = getOutputVcfHeader();
+        VariantContextWriter writer = getWriter(header);
+        writer.writeHeader(header);
 
-            // get all chromosomes in the query or organism, and export the variants for each chromosome
-            Set<String> chromosomes = getChromosomes(headers, studies, query);
-            for (String chromosome : chromosomes) {
-                exportChromosomeVariants(writers, chromosome);
-            }
-
-            writers.values().forEach(VariantContextWriter::close);
+        // get all chromosomes in the query or organism, and export the variants for each chromosome
+        Set<String> chromosomes = getChromosomes(header, studies, query);
+        for (String chromosome : chromosomes) {
+            // TODO: change method to use just one writer
+            exportChromosomeVariants(writer, chromosome);
         }
+
+        writer.close();
     }
 
-    private Map<String, VCFHeader> getVcfHeaders() {
+    private VCFHeader getOutputVcfHeader() {
         // get VCF header(s) and write them to output file(s)
         logger.info("Generating VCF headers ...");
         Map<String, VariantSource> sources = exporter.getSources(variantSourceDBAdaptor, studies);
-        Map<String, VCFHeader> headers = null;
+        VCFHeader header = null;
         try {
-            headers = exporter.getVcfHeaders(sources);
-            checkHeaders(headers);
+            header = exporter.getMergedVCFHeader(sources);
         } catch (IOException e) {
             logger.error("Error getting vcf headers: {}", e.getMessage());
         }
-        return headers;
+        return header;
     }
 
-    private void exportChromosomeVariants(Map<String, VariantContextWriter> writers, String chromosome) {
+    private void exportChromosomeVariants(VariantContextWriter writer, String chromosome) {
         List<Region> allRegionsInChromosome = regionFactory.getRegionsForChromosome(chromosome);
         for (Region region : allRegionsInChromosome) {
             VariantDBIterator regionVariantsIterator = variantDBAdaptor.iterator(getRegionQuery(region));
-            Map<String, List<VariantContext>> exportedVariants = exporter.export(regionVariantsIterator, region, studies);
+            List<VariantContext> exportedVariants = exporter.export(regionVariantsIterator, region);
             failedVariants += exporter.getFailedVariants();
-            writeRegionVariants(writers, exportedVariants);
+            exportedVariants.forEach(writer::add);
         }
     }
 
-    private void writeRegionVariants(Map<String, VariantContextWriter> writers, Map<String, List<VariantContext>> exportedVariants) {
-        exportedVariants.forEach((study, variants) -> {
-            if (writers.containsKey(study)) {
-                Collections.sort(variants, (v1, v2)-> v1.getStart() - v2.getStart());
-                VariantContextWriter writer = writers.get(study);
-                variants.forEach(writer::add);
-            }
-        });
-    }
+//    private void writeRegionVariants(VariantContextWriter writer, List<VariantContext> exportedVariants) {
+//        exportedVariants.forEach(writer::add);
+//    }
 
     private QueryOptions getRegionQuery(Region region) {
         QueryOptions regionQuery = new QueryOptions(query);
@@ -172,48 +183,32 @@ public class VariantExporterController {
         return regionQuery;
     }
 
-    private void checkHeaders(Map<String, VCFHeader> headers) {
-        for (String studyId : studies) {
-            if (!headers.containsKey(studyId)) {
-                throw new IllegalArgumentException("Aborting VCF export: missing header for study " + studyId);
-            }
-        }
-    }
+    private VariantContextWriter getWriter(VCFHeader vcfHeader) {
+        LocalDateTime now = LocalDateTime.now();
+        String fileName = species + "_exported_" + now + ".vcf.gz";
+        outputFilePath = Paths.get(outputDir).resolve(fileName);
 
-    private Map<String, VariantContextWriter> getWriters(Map<String, VCFHeader> headers) {
-        String suffix = ".exported.vcf.gz";
-        Map<String, VariantContextWriter> writers = new TreeMap<>();
-        outputFilePaths = new HashMap<>();
-
-        // setup writers
-        for (String studyId : studies) {
-
-            Path outputPath = Paths.get(outputDir).resolve(studyId + suffix);
-            outputFilePaths.put(studyId, outputPath.toString());
-            // get sequence dictionary from header
-            SAMSequenceDictionary sequenceDictionary;
-            try {
-                sequenceDictionary = headers.get(studyId).getSequenceDictionary();
-            } catch (SAMException e) {
-                logger.warn("Incorrect sequence / contig meta-data found in study {}: {}", studyId, e.getMessage());
-                logger.warn("It won't be included in study {} output VCF header", studyId);
-                sequenceDictionary = null;
-            }
-
-            VariantContextWriterBuilder builder = new VariantContextWriterBuilder();
-            VariantContextWriter writer = builder.setOutputFile(outputPath.toFile())
-                    .setReferenceDictionary(sequenceDictionary)
-                    .unsetOption(Options.INDEX_ON_THE_FLY)
-                    .build();
-            writers.put(studyId, writer);
+        // get sequence dictionary from header
+        SAMSequenceDictionary sequenceDictionary;
+        try {
+            sequenceDictionary = vcfHeader.getSequenceDictionary();
+        } catch (SAMException e) {
+            logger.warn("Incorrect sequence / contig meta-data: ", e.getMessage());
+            logger.warn("It won't be included in output VCF header");
+            sequenceDictionary = null;
         }
 
-        //logger.info("Exporting to files: [" + String.join(" ", files) + "]");
+        // setup writer
+        VariantContextWriterBuilder builder = new VariantContextWriterBuilder();
+        VariantContextWriter writer = builder.setOutputFile(outputFilePath.toFile())
+                .setReferenceDictionary(sequenceDictionary)
+                .unsetOption(Options.INDEX_ON_THE_FLY)
+                .build();
 
-        return writers;
+        return writer;
     }
 
-    private Set<String> getChromosomes(Map<String, VCFHeader> headers, List<String> studyIds, QueryOptions options) {
+    private Set<String> getChromosomes(VCFHeader headers, List<String> studyIds, QueryOptions options) {
         Set<String> chromosomes;
 
         List<String> regions = options.getAsStringList(VariantDBAdaptor.REGION);
@@ -233,19 +228,20 @@ public class VariantExporterController {
         return regions.stream().map(r -> r.split(":")[0]).collect(Collectors.toSet());
     }
 
-    private Set<String> getChromosomesFromVCFHeader(Map<String, VCFHeader> headers, List<String> studyIds) {
+    // TODO: this method is not going to work well because the sequence dictionarys are not stored correctly in the files collection
+    private Set<String> getChromosomesFromVCFHeader(VCFHeader header, List<String> studyIds) {
         Set<String> chromosomes = new HashSet<>();
         // setup writers
         for (String studyId : studyIds) {
-            SAMSequenceDictionary sequenceDictionary = headers.get(studyId).getSequenceDictionary();
+            SAMSequenceDictionary sequenceDictionary = header.getSequenceDictionary();
             chromosomes.addAll(sequenceDictionary.getSequences().stream().map(SAMSequenceRecord::getSequenceName).collect(Collectors.toSet()));
         }
 
         return chromosomes;
     }
 
-    public Map<String, String> getOuputFiles() {
-        return outputFilePaths;
+    public String getOuputFilePath() {
+        return outputFilePath.toString();
     }
 
     public int getFailedVariants() {
