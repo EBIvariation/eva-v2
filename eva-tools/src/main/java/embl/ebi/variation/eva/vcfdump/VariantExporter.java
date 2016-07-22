@@ -50,7 +50,6 @@ public class VariantExporter {
      * VariantExporter to dump several VCFs. If you just want to count on one dump, use a `new VariantExporter` each time.
      */
     private int failedVariants;
-//    private String regionSequence;
     private BiodataVariantToVariantContextConverter variantToVariantContextConverter;
     private Set<String> outputSampleNames;
 
@@ -73,7 +72,7 @@ public class VariantExporter {
         failedVariants = 0;
 
         // region sequence contains the last exported region: we set it to null to get the new region sequence from cellbase if needed
-//        regionSequence = null;
+        variantToVariantContextConverter.cleanCachedRegionSequence();
 
         while (iterator.hasNext()) {
             Variant variant = iterator.next();

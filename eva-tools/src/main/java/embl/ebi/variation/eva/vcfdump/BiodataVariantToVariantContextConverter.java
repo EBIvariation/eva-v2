@@ -199,7 +199,7 @@ public class BiodataVariantToVariantContextConverter {
             org.opencb.biodata.models.feature.Genotype genotype = new org.opencb.biodata.models.feature.Genotype(gt, variantAlleles[0].getBaseString(), variantAlleles[1].getBaseString());
             List<Allele> genotypeAlleles = new ArrayList<>();
             for (int index : genotype.getAllelesIdx()) {
-                if (index == -1) {
+                if (index == -1 || index > NO_CALL_ALLELE_INDEX) {
                     index = NO_CALL_ALLELE_INDEX;
                 }
                 genotypeAlleles.add(variantAlleles[index]);
@@ -219,4 +219,7 @@ public class BiodataVariantToVariantContextConverter {
         }
     }
 
+    public void cleanCachedRegionSequence() {
+        regionSequence = null;
+    }
 }
