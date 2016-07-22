@@ -45,6 +45,7 @@ public class BiodataVariantToVariantContextConverter {
     private CellbaseWSClient cellbaseClient;
     private String regionSequence;
     private Map<String, Map<String,String>> studiesSampleNamesEquivalences;
+    private static final int NO_CALL_ALLELE_INDEX = 2;
 
     // TODO: use a different value?
     public static final double UNKNOWN_QUAL = -10;
@@ -198,6 +199,9 @@ public class BiodataVariantToVariantContextConverter {
             org.opencb.biodata.models.feature.Genotype genotype = new org.opencb.biodata.models.feature.Genotype(gt, variantAlleles[0].getBaseString(), variantAlleles[1].getBaseString());
             List<Allele> genotypeAlleles = new ArrayList<>();
             for (int index : genotype.getAllelesIdx()) {
+                if (index == -1) {
+                    index = NO_CALL_ALLELE_INDEX;
+                }
                 genotypeAlleles.add(variantAlleles[index]);
             }
 
