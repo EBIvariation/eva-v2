@@ -64,11 +64,16 @@ public class VariantExporterController {
     private final VariantSourceDBAdaptor variantSourceDBAdaptor;
     private final VariantDBAdaptor variantDBAdaptor;
     private final QueryOptions query;
-   // private final RegionDivider regionDivider;
     private final RegionFactory regionFactory;
     private final VariantExporter exporter;
     private Path outputFilePath;
     private int failedVariants;
+
+    public VariantExporterController(String species, String dbName, List<String> studies, String outputDir,
+                                     MultivaluedMap<String, String> queryParameters)
+            throws IllegalAccessException, ClassNotFoundException, InstantiationException, StorageManagerException, URISyntaxException {
+        this(species, dbName, studies, null, outputDir, queryParameters);
+    }
 
     public VariantExporterController(String species, String dbName, List<String> studies, List<String> files,
                                      String outputDir, MultivaluedMap<String, String> queryParameters)
@@ -82,7 +87,6 @@ public class VariantExporterController {
         variantDBAdaptor = getVariantDBAdaptor(dbName);
         query = getQuery(queryParameters);
         variantSourceDBAdaptor = variantDBAdaptor.getVariantSourceDBAdaptor();
-        //this.regionDivider = new RegionDivider(WINDOW_SIZE);
         regionFactory = new RegionFactory(WINDOW_SIZE, variantDBAdaptor, query);
         exporter = new VariantExporter(cellBaseClient);
         failedVariants = 0;
@@ -119,22 +123,6 @@ public class VariantExporterController {
         return query;
     }
 
-//    public void run() {
-//        Map<String, VCFHeader> headers = getVcfHeaders();
-//        if (headers != null) {
-//            Map<String, VariantContextWriter> writers = getWriters(headers);
-//            writers.forEach((study, writer) -> writer.writeHeader(headers.get(study)));
-//
-//            // get all chromosomes in the query or organism, and export the variants for each chromosome
-//            Set<String> chromosomes = getChromosomes(headers, studies, query);
-//            for (String chromosome : chromosomes) {
-//                exportChromosomeVariants(writers, chromosome);
-//            }
-//
-//            writers.values().forEach(VariantContextWriter::close);
-//        }
-//    }
-
     public void run() {
         VCFHeader header = getOutputVcfHeader();
         VariantContextWriter writer = getWriter(header);
@@ -143,7 +131,6 @@ public class VariantExporterController {
         // get all chromosomes in the query or organism, and export the variants for each chromosome
         Set<String> chromosomes = getChromosomes(header, studies, query);
         for (String chromosome : chromosomes) {
-            // TODO: change method to use just one writer
             exportChromosomeVariants(writer, chromosome);
         }
 
@@ -172,10 +159,6 @@ public class VariantExporterController {
             exportedVariants.forEach(writer::add);
         }
     }
-
-//    private void writeRegionVariants(VariantContextWriter writer, List<VariantContext> exportedVariants) {
-//        exportedVariants.forEach(writer::add);
-//    }
 
     private QueryOptions getRegionQuery(Region region) {
         QueryOptions regionQuery = new QueryOptions(query);

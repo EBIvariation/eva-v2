@@ -47,9 +47,6 @@ import static org.junit.Assert.*;
  */
 public class VariantExporterControllerTest {
 
-//    @Rule
-//    public ExpectedException thrown = ExpectedException.none();
-
     private static final String DB_NAME = "VariantExporterTest";
     public static final String OUTPUT_DIR = "/tmp/";
 
@@ -57,7 +54,6 @@ public class VariantExporterControllerTest {
     private static VariantStorageManager variantStorageManager;
     private static VariantDBAdaptor variantDBAdaptor;
     private static VariantDBAdaptor cowVariantDBAdaptor;
-//    private static VariantSourceDBAdaptor variantSourceDBAdaptor;
     private static final Logger logger = LoggerFactory.getLogger(VariantExporterControllerTest.class);
     private static final MultivaluedMap<String, String> emptyFilter = new MultivaluedHashMap<>();
     private static List<String> testOutputFiles;
@@ -75,7 +71,6 @@ public class VariantExporterControllerTest {
         variantDBAdaptor = variantStorageManager.getDBAdaptor(DB_NAME, null);
         cowVariantDBAdaptor = variantStorageManager.getDBAdaptor(VariantExporterTestDB.COW_TEST_DB_NAME, null);
         testOutputFiles = new ArrayList<>();
-//        variantSourceDBAdaptor = variantDBAdaptor.getVariantSourceDBAdaptor();
     }
 
     /**
@@ -149,11 +144,8 @@ public class VariantExporterControllerTest {
         String studyId = "PRJEB6119";
         List<String> studies = Collections.singletonList(studyId);
 
-        // TODO: remove files filter from Exporter
         // TODO: another test with query parameters
-        // TODO: what is being used for species name?
-//        VariantExporterController controller = new VariantExporterController("hsapiens", DB_NAME, studies, null, OUTPUT_DIR, emptyFilter);
-        VariantExporterController controller = new VariantExporterController("btaurus", VariantExporterTestDB.COW_TEST_DB_NAME, studies, null, OUTPUT_DIR, emptyFilter);
+        VariantExporterController controller = new VariantExporterController("btaurus", VariantExporterTestDB.COW_TEST_DB_NAME, studies, OUTPUT_DIR, emptyFilter);
         controller.run();
 
         ////////// checks
@@ -168,18 +160,18 @@ public class VariantExporterControllerTest {
 
     @Test
     public void testVcfHtsExportSeveralStudies() throws Exception {
-        String study7 = "7";
-        String study8 = "8";
-        List<String> studies = Arrays.asList(study7, study8);
+        String study6119 = "PRJEB6119";
+        String study7061 = "PRJEB7061";
+        List<String> studies = Arrays.asList(study6119, study7061);
 
-        VariantExporterController controller = new VariantExporterController("hsapiens", DB_NAME, studies, null, OUTPUT_DIR, emptyFilter);
+        VariantExporterController controller = new VariantExporterController("btaurus", DB_NAME, studies, OUTPUT_DIR, emptyFilter);
         controller.run();
 
         ////////// checks
         String outputFile = controller.getOuputFilePath();
         testOutputFiles.add(outputFile);
         assertEquals(0, controller.getFailedVariants());   // test file should not have failed variants
-        QueryOptions query = getQuery(Arrays.asList(study7, study8));
+        QueryOptions query = getQuery(Arrays.asList(study6119, study7061));
         VariantDBIterator iterator = variantDBAdaptor.iterator(query);
         assertEqualLinesFilesAndDB(outputFile, iterator);
         checkOrderInOutputFile(outputFile);
@@ -194,7 +186,7 @@ public class VariantExporterControllerTest {
         MultivaluedMap<String, String> filter = new MultivaluedHashMap<>();
         filter.putSingle(VariantDBAdaptor.REGION, "20:61000-69000");
         filter.putSingle(VariantDBAdaptor.REFERENCE, "A");
-        VariantExporterController controller = new VariantExporterController("hsapiens", DB_NAME, studies, null, OUTPUT_DIR, filter);
+        VariantExporterController controller = new VariantExporterController("hsapiens", DB_NAME, studies, OUTPUT_DIR, filter);
         controller.run();
 
         ////////// checks
@@ -220,7 +212,7 @@ public class VariantExporterControllerTest {
         MultivaluedMap<String, String> filter = new MultivaluedHashMap<>();
         filter.put(VariantDBAdaptor.REGION, Arrays.asList("20:61000-66000", "20:63000-69000"));
 
-        VariantExporterController controller = new VariantExporterController("hsapiens", DB_NAME, studies, null, OUTPUT_DIR, filter);
+        VariantExporterController controller = new VariantExporterController("hsapiens", DB_NAME, studies, OUTPUT_DIR, filter);
         controller.run();
 
         ////////// checks
@@ -248,7 +240,7 @@ public class VariantExporterControllerTest {
     public void testMissingStudy() throws Exception {
         List<String> studies = Arrays.asList("7", "9"); // study 9 doesn't exist
 
-        VariantExporterController controller = new VariantExporterController("hsapiens", DB_NAME, studies, null, OUTPUT_DIR, emptyFilter);
+        VariantExporterController controller = new VariantExporterController("hsapiens", DB_NAME, studies, OUTPUT_DIR, emptyFilter);
 
         controller.run();
     }
@@ -256,24 +248,24 @@ public class VariantExporterControllerTest {
     @Test(expected = IllegalArgumentException.class)
     public void nullSpeciesThrowsIllegalArgumentException() throws Exception {
         List<String> studies = Collections.singletonList("8");
-        new VariantExporterController(null, DB_NAME, studies, null, OUTPUT_DIR, emptyFilter);
+        new VariantExporterController(null, DB_NAME, studies, OUTPUT_DIR, emptyFilter);
     }
 
     @Test(expected = IllegalArgumentException.class)
     public void nullDbnameThrowsIllegalArgumentException() throws Exception {
         List<String> studies = Collections.singletonList("8");
-        new VariantExporterController("hsapiens", null, studies, null, OUTPUT_DIR, emptyFilter);
+        new VariantExporterController("hsapiens", null, studies, OUTPUT_DIR, emptyFilter);
     }
 
     @Test(expected = IllegalArgumentException.class)
     public void emtpyStudiesThrowsIllegalArgumentException() throws Exception {
-        new VariantExporterController("hsapiens", DB_NAME, Collections.EMPTY_LIST, null, OUTPUT_DIR, emptyFilter);
+        new VariantExporterController("hsapiens", DB_NAME, Collections.EMPTY_LIST, OUTPUT_DIR, emptyFilter);
     }
 
     @Test(expected = IllegalArgumentException.class)
     public void nullOutputDirThrowsIllegalArgumentException() throws Exception {
         List<String> studies = Collections.singletonList("8");
-        new VariantExporterController("hsapiens", DB_NAME, studies, null, null, emptyFilter);
+        new VariantExporterController("hsapiens", DB_NAME, studies, null, emptyFilter);
     }
 
     private void assertEqualLinesFilesAndDB(String fileName, VariantDBIterator iterator) throws IOException {
@@ -313,7 +305,6 @@ public class VariantExporterControllerTest {
     }
 
     private void assertVcfOrderedByCoordinate(String fileName) {
-        // TODO: implement
         logger.info("Checking that {} is sorted by coordinate", fileName);
         Set<String> finishedContigs = new HashSet<>();
         VCFFileReader vcfReader = new VCFFileReader(new File(fileName), false);
