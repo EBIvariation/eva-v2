@@ -155,6 +155,7 @@ public class VariantExporterController {
         for (Region region : allRegionsInChromosome) {
             VariantDBIterator regionVariantsIterator = variantDBAdaptor.iterator(getRegionQuery(region));
             List<VariantContext> exportedVariants = exporter.export(regionVariantsIterator, region);
+            Collections.sort(exportedVariants, (v1, v2) -> v1.getStart() - v2.getStart());
             failedVariants += exporter.getFailedVariants();
             exportedVariants.forEach(writer::add);
         }
