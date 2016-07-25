@@ -90,15 +90,24 @@ public class VariantExporter {
         return variantsToExport;
     }
 
-    public Map<String, VariantSource> getSources(VariantSourceDBAdaptor sourceDBAdaptor, List<String> studyIds) {
+    public Map<String, VariantSource> getSources(VariantSourceDBAdaptor sourceDBAdaptor, List<String> studyIds) throws IllegalArgumentException {
         Map<String, VariantSource> sources = new TreeMap<>();
         List<VariantSource> sourcesList = sourceDBAdaptor.getAllSourcesByStudyIds(studyIds, new QueryOptions()).getResult();
+        checkIfTereAreSourceForEveryStudy(studyIds, sourcesList);
         Map<String, Map<String, String>> studiesSampleNamesMapping = checkIfConflictsInSampleNames(sourcesList);
         variantToVariantContextConverter = new BiodataVariantToVariantContextConverter(sourcesList, cellbaseClient, studiesSampleNamesMapping);
         for (VariantSource variantSource : sourcesList) {
             sources.put(variantSource.getStudyId(), variantSource);
         }
         return sources;
+    }
+
+    private void checkIfTereAreSourceForEveryStudy(List<String> studyIds, List<VariantSource> sourcesList) throws IllegalArgumentException {
+        List<String> missingStudies =
+                studyIds.stream().filter(study -> sourcesList.stream().noneMatch(source -> source.getStudyId().equals(study))).collect(Collectors.toList());
+        if (!missingStudies.isEmpty()) {
+            throw new IllegalArgumentException("Study(ies) " + String.join(", ", missingStudies) + " not found");
+        }
     }
 
     public Map<String, Map<String, String>> checkIfConflictsInSampleNames(Collection<VariantSource> sources) {
