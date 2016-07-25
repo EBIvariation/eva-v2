@@ -140,15 +140,18 @@ public class VariantExporterTest {
         assertEquals("5", file.getFileId());
         assertEquals(2504, file.getSamples().size());
 
-        // one study not in database
-        studies = Arrays.asList("2");
-        sources = variantExporter.getSources(variantSourceDBAdaptor, studies);
-        assertEquals(0, sources.size());
-
         // empty study filter
         studies = new ArrayList<>();
         sources = variantExporter.getSources(variantSourceDBAdaptor, studies);
         assertEquals(0, sources.size());
+    }
+
+    @Test(expected = IllegalArgumentException.class)
+    public void notExistingSourceShouldThrowException() {
+        VariantExporter variantExporter = new VariantExporter(null);
+        // The study with id "2" is not in database
+        List<String> study = Collections.singletonList("2");
+        Map<String, VariantSource> sources = variantExporter.getSources(variantSourceDBAdaptor, study);
     }
 
     @Test
