@@ -321,7 +321,9 @@ public class VariantExporterControllerTest {
                 assertFalse("The variants should by grouped by contig in the vcf output", finishedContigs.contains(lastContig));
                 previousStart = -1;
             }
-            assertTrue("The vcf is not sorted by coordinate: " + variant, variant.getStart() >= previousStart);
+            assertTrue("The vcf is not sorted by coordinate: " + variant.getContig() + ":" + variant.getStart() + ":" +
+                    variant.getReference() + "->" + variant.getAlternateAlleles() + "; Previous variant start: " + previousStart,
+                    variant.getStart() >= previousStart);
             previousStart = variant.getStart();
         }
 
