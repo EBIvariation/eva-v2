@@ -163,7 +163,7 @@ public class VariantExporterControllerTest {
         QueryOptions query = getQuery(studies);
         VariantDBIterator iterator = cowVariantDBAdaptor.iterator(query);
         assertEqualLinesFilesAndDB(outputFile, iterator);
-        checkOrderInOutputFiles(outputFile);
+        checkOrderInOutputFile(outputFile);
     }
 
     @Test
@@ -179,19 +179,10 @@ public class VariantExporterControllerTest {
         String outputFile = controller.getOuputFilePath();
         testOutputFiles.add(outputFile);
         assertEquals(0, controller.getFailedVariants());   // test file should not have failed variants
-
-        // TODO: both studies in just one query
-        // for study 7
-        QueryOptions query = getQuery(Collections.singletonList(study7));
+        QueryOptions query = getQuery(Arrays.asList(study7, study8));
         VariantDBIterator iterator = variantDBAdaptor.iterator(query);
         assertEqualLinesFilesAndDB(outputFile, iterator);
-
-        // for study 8
-        query = getQuery(Collections.singletonList(study8));
-        iterator = variantDBAdaptor.iterator(query);
-        assertEqualLinesFilesAndDB(outputFile, iterator);
-
-        checkOrderInOutputFiles(outputFile);
+        checkOrderInOutputFile(outputFile);
     }
 
     @Test
@@ -217,7 +208,7 @@ public class VariantExporterControllerTest {
         VariantDBIterator iterator = variantDBAdaptor.iterator(query);
         assertEqualLinesFilesAndDB(outputFile, iterator);
 
-        checkOrderInOutputFiles(outputFile);
+        checkOrderInOutputFile(outputFile);
     }
 
     @Test
@@ -243,10 +234,10 @@ public class VariantExporterControllerTest {
 
         assertEqualLinesFilesAndDB(outputFile, iterator);
 
-        checkOrderInOutputFiles(outputFile);
+        checkOrderInOutputFile(outputFile);
     }
 
-    private void checkOrderInOutputFiles(String outputFile) {
+    private void checkOrderInOutputFile(String outputFile) {
         assertVcfOrderedByCoordinate(outputFile);
         this.logger.info("Deleting output temp file {}", outputFile);
         boolean delete = new File(outputFile).delete();
