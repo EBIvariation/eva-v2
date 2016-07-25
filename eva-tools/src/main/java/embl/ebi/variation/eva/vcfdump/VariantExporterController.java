@@ -129,7 +129,7 @@ public class VariantExporterController {
         writer.writeHeader(header);
 
         // get all chromosomes in the query or organism, and export the variants for each chromosome
-        Set<String> chromosomes = getChromosomes(header, studies, query);
+        Set<String> chromosomes = getChromosomes(query);
         for (String chromosome : chromosomes) {
             exportChromosomeVariants(writer, chromosome);
         }
@@ -192,7 +192,7 @@ public class VariantExporterController {
         return writer;
     }
 
-    private Set<String> getChromosomes(VCFHeader headers, List<String> studyIds, QueryOptions options) {
+    private Set<String> getChromosomes(QueryOptions options) {
         Set<String> chromosomes;
 
         List<String> regions = options.getAsStringList(VariantDBAdaptor.REGION);
@@ -200,9 +200,10 @@ public class VariantExporterController {
             chromosomes = getChromosomesFromRegionFilter(regions);
         } else {
             chromosomes = cellBaseClient.getChromosomes();
-            if (chromosomes == null || chromosomes.isEmpty()) {
-                chromosomes = getChromosomesFromVCFHeader(headers, studyIds);
-            }
+        }
+        if (chromosomes.isEmpty()) {
+            throw new RuntimeException("Chromosomes for species " + species + " not found");
+            // TODO distinct query for getting all the chromosomes from the database
         }
         logger.debug("Chromosomes: {}", String.join(", ", chromosomes));
         return chromosomes;
@@ -212,7 +213,10 @@ public class VariantExporterController {
         return regions.stream().map(r -> r.split(":")[0]).collect(Collectors.toSet());
     }
 
-    // TODO: this method is not going to work well because the sequence dictionarys are not stored correctly in the files collection
+    /*
+     @deprecated this method is not going to work well because the sequence dictionaries are not stored correctly in the files collection
+      */
+    @Deprecated
     private Set<String> getChromosomesFromVCFHeader(VCFHeader header, List<String> studyIds) {
         Set<String> chromosomes = new HashSet<>();
         // setup writers
