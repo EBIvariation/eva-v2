@@ -21,12 +21,11 @@ package embl.ebi.variation.eva.vcfdump;
 import embl.ebi.variation.eva.vcfdump.cellbasewsclient.CellbaseWSClient;
 import embl.ebi.variation.eva.vcfdump.exception.CellbaseSequenceDownloadError;
 import htsjdk.variant.variantcontext.*;
+import org.broadinstitute.variant.vcf.VCFConstants;
 import org.opencb.biodata.models.feature.Region;
 import org.opencb.biodata.models.variant.Variant;
 import org.opencb.biodata.models.variant.VariantSource;
 import org.opencb.biodata.models.variant.VariantSourceEntry;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 import java.util.*;
 import java.util.stream.Collectors;
@@ -36,22 +35,13 @@ import java.util.stream.Collectors;
  */
 public class BiodataVariantToVariantContextConverter {
 
-    // TODO: remove if not used
-    private static final Logger logger = LoggerFactory.getLogger(BiodataVariantToVariantContextConverter.class);
-
-
+    public static final String GENOTYPE_KEY = "GT";
     private final VariantContextBuilder variantContextBuilder;
     private final List<VariantSource> sources;
     private CellbaseWSClient cellbaseClient;
     private String regionSequence;
     private Map<String, Map<String,String>> studiesSampleNamesEquivalences;
     private static final int NO_CALL_ALLELE_INDEX = 2;
-
-    // TODO: use a different value?
-    public static final double UNKNOWN_QUAL = -10;
-
-    // TODO: check if there is a PASS constant in any of the libraries
-    public static final String FILTER_PASS = "PASS";
 
     public BiodataVariantToVariantContextConverter(List<VariantSource> sources, CellbaseWSClient cellbaseWSClient,
                                                    Map<String, Map<String,String>> studiesSampleNamesEquivalences)
@@ -63,10 +53,7 @@ public class BiodataVariantToVariantContextConverter {
     }
 
     public VariantContext transform(Variant variant, Region region) throws CellbaseSequenceDownloadError {
-        // TODO: alleles array: use array or another structure?
         String[] allelesArray = getAllelesArray(variant, region);
-
-//        double qual = getQual(variant);
 
         Set<Genotype> genotypes = getGenotypes(variant, allelesArray);
 
@@ -75,39 +62,28 @@ public class BiodataVariantToVariantContextConverter {
                 // TODO: check start and end for indels
                 .start(variant.getStart())
                 .stop(variant.getEnd())
-//                .id(String.join(";", variant.getIds()))   // in multiallelic, this results in duplicated ids, across several rows
                 .noID()
                 .alleles(allelesArray)
-                // TODO: if qual is not set, which value is written to the VCF?
-//                .log10PError(qual)
-                // TODO: Info fields
-                .filter(FILTER_PASS)
+                .filter(VCFConstants.UNFILTERED)
                 .genotypes(genotypes).make();
         return variantContext;
     }
 
     private String[] getAllelesArray(Variant variant, Region region) throws CellbaseSequenceDownloadError {
-        String[] allelesArray = {variant.getReference(), variant.getAlternate()};
+        String[] allelesArray;
         // if there are indels, we cannot use the normalized alleles, (hts forbids empty alleles) so we have to take them from cellbase
-        boolean emptyAlleles = false;
-        for (String a : allelesArray) {
-            if (a.isEmpty()) {
-                emptyAlleles = true;
-                break;
-            }
-        }
-
-        if (emptyAlleles) {
+        if (variant.getReference().isEmpty() || variant.getAlternate().isEmpty()) {
             String contextNucleotide;
             if (region != null) {
                 contextNucleotide = getContextNucleotideFromCellbaseCachingRegions(variant, variant.getStart(), region);
             } else {
                 contextNucleotide = getContextNucleotideFromCellbase(variant, variant.getStart());
             }
-            // TODO: can be this made more efficient?
-            allelesArray[0] = contextNucleotide + variant.getReference();
-            allelesArray[1] = contextNucleotide + variant.getAlternate();
+
+            allelesArray = new String[] {contextNucleotide + variant.getReference(), contextNucleotide + variant.getAlternate()};
             variant.setEnd(variant.getStart() + allelesArray[0].length() - 1);
+        } else {
+            allelesArray = new String[] {variant.getReference(), variant.getAlternate()};
         }
 
         return allelesArray;
@@ -159,20 +135,6 @@ public class BiodataVariantToVariantContextConverter {
         return regionSequence.substring(relativePosition, relativePosition + 1);
     }
 
-    private double getQual(Variant variant) {
-        double qual;
-//        if (studies.size() == 1) {
-//            // TODO: we need the file id
-//            qual = Double.parseDouble(variant.getSourceEntries().get(studies.get(0)).getAttribute("QUAL"));
-//        } else {
-//            // TODO: there is a qual for study, how can we merge them?
-//            qual = UNKNOWN_QUAL;
-//        }
-        // TODO: constant for unknown qual (.) en samtools library?
-        qual = UNKNOWN_QUAL;
-        return qual;
-    }
-
     private Set<Genotype> getGenotypes(Variant variant, String[] allelesArray) {
         Set<Genotype> genotypes = new HashSet<>();
 
@@ -185,17 +147,13 @@ public class BiodataVariantToVariantContextConverter {
             for (VariantSourceEntry variantStudyEntry : variantStudyEntries) {
                 genotypes = getStudyGenotypes(genotypes, variantAlleles, variantStudyEntry);
             }
-            // TODO: fill with missing values (./.), or if we don't add the genotypes the writer will write the missing values? Check in VariantExporterController
-//                GenotypeBuilder builder = new GenotypeBuilder().name(sampleName).alleles(null);
-
         }
         return genotypes;
     }
 
     private Set<Genotype> getStudyGenotypes(Set<Genotype> genotypes, Allele[] variantAlleles, VariantSourceEntry variantStudyEntry) {
         for (Map.Entry<String, Map<String, String>> sampleEntry : variantStudyEntry.getSamplesData().entrySet()) {
-            // TODO: constant for GT?
-            String gt = sampleEntry.getValue().get("GT");
+            String gt = sampleEntry.getValue().get(GENOTYPE_KEY);
             org.opencb.biodata.models.feature.Genotype genotype = new org.opencb.biodata.models.feature.Genotype(gt, variantAlleles[0].getBaseString(), variantAlleles[1].getBaseString());
             List<Allele> genotypeAlleles = new ArrayList<>();
             for (int index : genotype.getAllelesIdx()) {

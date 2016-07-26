@@ -174,9 +174,6 @@ public class VariantExporter {
         }
 
         return headers;
-
-//        TODO: do we need this line?
-//        header.addMetaDataLine(new VCFFilterHeaderLine(".", "No FILTER info"));
     }
 
     public VCFHeader getMergedVCFHeader(Map<String, VariantSource> sources) throws IOException {
