@@ -64,7 +64,7 @@ public class BiodataVariantToVariantContextConverter {
                 .stop(variant.getEnd())
                 .noID()
                 .alleles(allelesArray)
-                .filter(VCFConstants.UNFILTERED)
+                .unfiltered()
                 .genotypes(genotypes).make();
         return variantContext;
     }
@@ -155,7 +155,7 @@ public class BiodataVariantToVariantContextConverter {
         for (Map.Entry<String, Map<String, String>> sampleEntry : variantStudyEntry.getSamplesData().entrySet()) {
             String gt = sampleEntry.getValue().get(GENOTYPE_KEY);
             org.opencb.biodata.models.feature.Genotype genotype = new org.opencb.biodata.models.feature.Genotype(gt, variantAlleles[0].getBaseString(), variantAlleles[1].getBaseString());
-            List<Allele> genotypeAlleles = new ArrayList<>();
+            List<Allele> genotypeAlleles = new ArrayList<>(2);
             for (int index : genotype.getAllelesIdx()) {
                 if (index == -1 || index > NO_CALL_ALLELE_INDEX) {
                     index = NO_CALL_ALLELE_INDEX;

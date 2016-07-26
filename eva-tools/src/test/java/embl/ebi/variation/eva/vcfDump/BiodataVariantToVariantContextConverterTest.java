@@ -352,9 +352,7 @@ public class BiodataVariantToVariantContextConverterTest {
         assertEquals(Allele.create(ref, true), variantContext.getReference());
         assertEquals(Collections.singletonList(Allele.create(alt, false)), variantContext.getAlternateAlleles());
         assertTrue(variantContext.emptyID());
-        // TODO: QUAL
-//        assertEquals(100, variantContext.getPhredScaledQual(), 0);
-        assertEquals(Collections.singleton(VCFConstants.UNFILTERED), variantContext.getFilters());
+        assertTrue(variantContext.getFilters().isEmpty());
         assertEquals(0, variantContext.getCommonInfo().getAttributes().size());
         assertEquals(sampleNames, variantContext.getSampleNames());
         // TODO check genotypes. use assertEqualGenotypes?
