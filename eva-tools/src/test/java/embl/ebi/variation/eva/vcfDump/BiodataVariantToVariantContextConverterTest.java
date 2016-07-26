@@ -23,6 +23,7 @@ import embl.ebi.variation.eva.vcfdump.exception.CellbaseSequenceDownloadError;
 import htsjdk.variant.variantcontext.Allele;
 import htsjdk.variant.variantcontext.Genotype;
 import htsjdk.variant.variantcontext.VariantContext;
+import org.broadinstitute.variant.vcf.VCFConstants;
 import org.junit.After;
 import org.junit.BeforeClass;
 import org.junit.Test;
@@ -353,7 +354,7 @@ public class BiodataVariantToVariantContextConverterTest {
         assertTrue(variantContext.emptyID());
         // TODO: QUAL
 //        assertEquals(100, variantContext.getPhredScaledQual(), 0);
-        assertEquals(Collections.singleton(BiodataVariantToVariantContextConverter.FILTER_PASS), variantContext.getFilters());
+        assertEquals(Collections.singleton(VCFConstants.UNFILTERED), variantContext.getFilters());
         assertEquals(0, variantContext.getCommonInfo().getAttributes().size());
         assertEquals(sampleNames, variantContext.getSampleNames());
         // TODO check genotypes. use assertEqualGenotypes?
