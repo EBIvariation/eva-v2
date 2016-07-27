@@ -166,7 +166,7 @@ public class BiodataVariantToVariantContextConverter {
                 genotypeAlleles.add(variantAlleles[index]);
             }
 
-            genotypes.add(new GenotypeBuilder().name(getFixedSampleName(variantStudyEntry.getStudyId(), sampleEntry.getKey())).alleles(genotypeAlleles).phased(genotype.isPhased()).make());
+            genotypes.add(new GenotypeBuilder().name(getFixedSampleName(variantStudyEntry.getStudyId(), sampleEntry.getKey())).alleles(genotypeAlleles).make());
         }
         return genotypes;
     }
