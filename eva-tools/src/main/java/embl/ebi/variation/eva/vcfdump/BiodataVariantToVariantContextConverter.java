@@ -41,7 +41,7 @@ public class BiodataVariantToVariantContextConverter {
     private String regionSequence;
     private Map<String, Map<String,String>> studiesSampleNamesEquivalences;
     private static final int NO_CALL_ALLELE_INDEX = 2;
-    
+
     public BiodataVariantToVariantContextConverter(CellbaseWSClient cellbaseWSClient) {
         this(null, cellbaseWSClient, null);
     }
@@ -104,7 +104,7 @@ public class BiodataVariantToVariantContextConverter {
                         contextNucleotidePosition + "-" + contextNucleotidePosition, e);
             }
         } else {
-            throw new IllegalArgumentException(String.format(
+            throw new IllegalStateException(String.format(
                     "CellBase was not provided, needed to fill empty alleles in variant %s:%d:%s>%s", variant.getChromosome(),
                     variant.getStart(), variant.getReference(), variant.getAlternate()));
         }
@@ -127,7 +127,7 @@ public class BiodataVariantToVariantContextConverter {
             String nucleotide = getNucleotideFromRegionSequence(start, region.getStart(), regionSequence);
             return nucleotide;
         } else {
-            throw new IllegalArgumentException(String.format(
+            throw new IllegalStateException(String.format(
                     "CellBase was not provided, needed to fill empty alleles in variant %s:%d:%s>%s",
                     variant.getChromosome(), variant.getStart(), variant.getReference(), variant.getAlternate()));
         }

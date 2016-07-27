@@ -23,7 +23,6 @@ import embl.ebi.variation.eva.vcfdump.exception.CellbaseSequenceDownloadError;
 import htsjdk.variant.variantcontext.Allele;
 import htsjdk.variant.variantcontext.Genotype;
 import htsjdk.variant.variantcontext.VariantContext;
-import org.broadinstitute.variant.vcf.VCFConstants;
 import org.junit.After;
 import org.junit.BeforeClass;
 import org.junit.Test;
@@ -161,7 +160,7 @@ public class BiodataVariantToVariantContextConverterTest {
         checkVariantContext(variantContext, CHR_1, 1100, 1101, "TA", "T", new HashSet<>(s1s6SampleList));
     }
 
-    @Test(expected=IllegalArgumentException.class)
+    @Test(expected=IllegalStateException.class)
     public void singleStudyInsertionMissingCellbase() throws CellbaseSequenceDownloadError {
         // create SNV variant
         VariantSource variantSource = createTestVariantSource(STUDY_1);
