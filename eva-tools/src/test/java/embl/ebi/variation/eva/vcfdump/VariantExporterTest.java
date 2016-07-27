@@ -163,19 +163,19 @@ public class VariantExporterTest {
         VariantExporter variantExporter = new VariantExporter(null);
 
         // sutdy 1 and 2 don't share sample names
-        assertNull(variantExporter.checkIfConflictsInSampleNames((Arrays.asList(variantSource, variantSource2))));
+        assertNull(variantExporter.createNonConflictingSampleNames((Arrays.asList(variantSource, variantSource2))));
 
         // sutdy 2 and 3 don't share sample names
-        assertNull(variantExporter.checkIfConflictsInSampleNames((Arrays.asList(variantSource2, variantSource3))));
+        assertNull(variantExporter.createNonConflictingSampleNames((Arrays.asList(variantSource2, variantSource3))));
 
         // sutdy 1 and 3 share sample some names
-        Map<String, Map<String, String>> study1And3SampleNameTranslations = variantExporter.checkIfConflictsInSampleNames((Arrays.asList(variantSource, variantSource3)));
+        Map<String, Map<String, String>> study1And3SampleNameTranslations = variantExporter.createNonConflictingSampleNames((Arrays.asList(variantSource, variantSource3)));
         s1s6SampleList.forEach(sampleName -> study1And3SampleNameTranslations.get(STUDY_1).get(sampleName).equals(STUDY_1 + "_" + sampleName));
         s2s3SampleList.forEach(sampleName -> study1And3SampleNameTranslations.get(STUDY_3).get(sampleName).equals(STUDY_3 + "_" + sampleName));
 
 
         // sutdy 1 and 3 (but not 2) share sample some names
-        Map<String, Map<String, String>> study1And2And3SampleNameTranslations = variantExporter.checkIfConflictsInSampleNames((Arrays.asList(variantSource, variantSource2, variantSource3)));
+        Map<String, Map<String, String>> study1And2And3SampleNameTranslations = variantExporter.createNonConflictingSampleNames((Arrays.asList(variantSource, variantSource2, variantSource3)));
         s1s6SampleList.forEach(sampleName -> study1And2And3SampleNameTranslations.get(STUDY_1).get(sampleName).equals(STUDY_1 + "_" + sampleName));
         c1c6SampleList.forEach(sampleName -> study1And2And3SampleNameTranslations.get(STUDY_2).get(sampleName).equals(STUDY_2 + "_" + sampleName));
         s2s3SampleList.forEach(sampleName -> study1And2And3SampleNameTranslations.get(STUDY_3).get(sampleName).equals(STUDY_3 + "_" + sampleName));

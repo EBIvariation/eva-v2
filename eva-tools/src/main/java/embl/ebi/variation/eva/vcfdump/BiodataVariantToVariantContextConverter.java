@@ -21,7 +21,6 @@ package embl.ebi.variation.eva.vcfdump;
 import embl.ebi.variation.eva.vcfdump.cellbasewsclient.CellbaseWSClient;
 import embl.ebi.variation.eva.vcfdump.exception.CellbaseSequenceDownloadError;
 import htsjdk.variant.variantcontext.*;
-import org.broadinstitute.variant.vcf.VCFConstants;
 import org.opencb.biodata.models.feature.Region;
 import org.opencb.biodata.models.variant.Variant;
 import org.opencb.biodata.models.variant.VariantSource;
@@ -37,11 +36,15 @@ public class BiodataVariantToVariantContextConverter {
 
     public static final String GENOTYPE_KEY = "GT";
     private final VariantContextBuilder variantContextBuilder;
-    private final List<VariantSource> sources;
+    private List<VariantSource> sources;
     private CellbaseWSClient cellbaseClient;
     private String regionSequence;
     private Map<String, Map<String,String>> studiesSampleNamesEquivalences;
     private static final int NO_CALL_ALLELE_INDEX = 2;
+    
+    public BiodataVariantToVariantContextConverter(CellbaseWSClient cellbaseWSClient) {
+        this(null, cellbaseWSClient, null);
+    }
 
     public BiodataVariantToVariantContextConverter(List<VariantSource> sources, CellbaseWSClient cellbaseWSClient,
                                                    Map<String, Map<String,String>> studiesSampleNamesEquivalences)
@@ -179,5 +182,13 @@ public class BiodataVariantToVariantContextConverter {
 
     public void cleanCachedRegionSequence() {
         regionSequence = null;
+    }
+
+    public void setSources(List<VariantSource> sources) {
+        this.sources = sources;
+    }
+
+    public void setStudiesSampleNamesEquivalences(Map<String, Map<String, String>> studiesSampleNamesEquivalences) {
+        this.studiesSampleNamesEquivalences = studiesSampleNamesEquivalences;
     }
 }

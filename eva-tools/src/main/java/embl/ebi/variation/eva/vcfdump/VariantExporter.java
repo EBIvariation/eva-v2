@@ -65,6 +65,7 @@ public class VariantExporter {
     public VariantExporter(CellbaseWSClient cellbaseClient) {
         this.cellbaseClient = cellbaseClient;
         outputSampleNames = new HashSet<>();
+        variantToVariantContextConverter = new BiodataVariantToVariantContextConverter(cellbaseClient);
     }
 
     public List<VariantContext> export(VariantDBIterator iterator, Region region) {
@@ -91,18 +92,23 @@ public class VariantExporter {
     }
 
     public Map<String, VariantSource> getSources(VariantSourceDBAdaptor sourceDBAdaptor, List<String> studyIds) throws IllegalArgumentException {
+        // get sources
         Map<String, VariantSource> sources = new TreeMap<>();
         List<VariantSource> sourcesList = sourceDBAdaptor.getAllSourcesByStudyIds(studyIds, new QueryOptions()).getResult();
-        checkIfTereAreSourceForEveryStudy(studyIds, sourcesList);
-        Map<String, Map<String, String>> studiesSampleNamesMapping = checkIfConflictsInSampleNames(sourcesList);
-        variantToVariantContextConverter = new BiodataVariantToVariantContextConverter(sourcesList, cellbaseClient, studiesSampleNamesMapping);
+        checkIfThereAreSourceForEveryStudy(studyIds, sourcesList);
+        variantToVariantContextConverter.setSources(sourcesList);
         for (VariantSource variantSource : sourcesList) {
             sources.put(variantSource.getStudyId(), variantSource);
         }
+
+        // check if there are conflicts in sample names and create new ones if needed
+        Map<String, Map<String, String>> studiesSampleNamesMapping = createNonConflictingSampleNames(sourcesList);
+        variantToVariantContextConverter.setStudiesSampleNamesEquivalences(studiesSampleNamesMapping);
+
         return sources;
     }
 
-    private void checkIfTereAreSourceForEveryStudy(List<String> studyIds, List<VariantSource> sourcesList) throws IllegalArgumentException {
+    private void checkIfThereAreSourceForEveryStudy(List<String> studyIds, List<VariantSource> sourcesList) throws IllegalArgumentException {
         List<String> missingStudies =
                 studyIds.stream().filter(study -> sourcesList.stream().noneMatch(source -> source.getStudyId().equals(study))).collect(Collectors.toList());
         if (!missingStudies.isEmpty()) {
@@ -110,7 +116,7 @@ public class VariantExporter {
         }
     }
 
-    public Map<String, Map<String, String>> checkIfConflictsInSampleNames(Collection<VariantSource> sources) {
+    public Map<String, Map<String, String>> createNonConflictingSampleNames(Collection<VariantSource> sources) {
         Map<String, Map<String, String>> studiesSampleNamesMapping = null;
 
         // create a list containing the sample names of every input study
@@ -121,7 +127,7 @@ public class VariantExporter {
             // if there are several studies, check if there are duplicate elements
             someSampleNameInMoreThanOneStudy = originalSampleNames.stream().anyMatch(s -> Collections.frequency(originalSampleNames, s) > 1);
             if (someSampleNameInMoreThanOneStudy) {
-                studiesSampleNamesMapping = resolveConflictsInSampleNamesAppendingStudyId(sources);
+                studiesSampleNamesMapping = resolveConflictsInSampleNamesPrefixingStudyId(sources);
             }
         }
 
@@ -132,7 +138,7 @@ public class VariantExporter {
         return studiesSampleNamesMapping;
     }
 
-    private Map<String, Map<String, String>> resolveConflictsInSampleNamesAppendingStudyId(Collection<VariantSource> sources) {
+    private Map<String, Map<String, String>> resolveConflictsInSampleNamesPrefixingStudyId(Collection<VariantSource> sources) {
         // each study will have a map translating from original sample name to "conflict free" one
         Map<String, Map<String, String>> studiesSampleNamesMapping = new HashMap<>();
         for (VariantSource source : sources) {
