@@ -56,7 +56,7 @@ public class BiodataVariantToVariantContextConverterTest {
         Config.setOpenCGAHome(System.getenv("OPENCGA_HOME") != null ? System.getenv("OPENCGA_HOME") : "/opt/opencga");
 
         // cellbase client stub that returns some recorded sequences
-        cellbaseWSClientStub = new CellbaseWSClient("anSpecie") {
+        cellbaseWSClientStub = new CellbaseWSClient("aSpecies") {
             @Override
             public String getSequence(Region region) throws IOException {
                 if (region.getChromosome().equals(CHR_1) && region.getStart() == 1099 && region.getEnd() == 1099) {
@@ -90,11 +90,10 @@ public class BiodataVariantToVariantContextConverterTest {
         assertEquals(1, variants.size());
 
         // export variant
-        // TODO: cellbaseClient and region are null because we don't need them. Change API?
         BiodataVariantToVariantContextConverter variantConverter =
                 new BiodataVariantToVariantContextConverter(Collections.singletonList(variantSource), null, noSampleNamesConflictSampleNameCorrections);
         VariantContext variantContext = variantConverter.transform(variants.get(0), null);
-        checkVariantContext(variantContext, CHR_1, 1000, 1000, "C", "A", variants.get(0).getSourceEntry(FILE_ID, STUDY_1).getSamplesData());
+        checkVariantContext(variantContext, CHR_1, 1000, 1000, "C", "A", variants.get(0).getSourceEntries(), false);
     }
 
     @Test
@@ -110,7 +109,7 @@ public class BiodataVariantToVariantContextConverterTest {
                 new BiodataVariantToVariantContextConverter(Collections.singletonList(variantSource), cellbaseWSClientStub, noSampleNamesConflictSampleNameCorrections);
         // TODO: test with region
         VariantContext variantContext = variantConverter.transform(variants.get(0), null);
-        checkVariantContext(variantContext, CHR_1, 1100, 1100, "T", "TG", variants.get(0).getSourceEntry(FILE_ID, STUDY_1).getSamplesData());
+        checkVariantContext(variantContext, CHR_1, 1100, 1100, "T", "TG", variants.get(0).getSourceEntries(), false);
     }
 
     @Test
@@ -126,7 +125,7 @@ public class BiodataVariantToVariantContextConverterTest {
                 new BiodataVariantToVariantContextConverter(Collections.singletonList(variantSource), cellbaseWSClientStub, noSampleNamesConflictSampleNameCorrections);
         // TODO: test with region
         VariantContext variantContext = variantConverter.transform(variants.get(0), null);
-        checkVariantContext(variantContext, CHR_1, 1100, 1101, "TA", "T", variants.get(0).getSourceEntry(FILE_ID, STUDY_1).getSamplesData());
+        checkVariantContext(variantContext, CHR_1, 1100, 1101, "TA", "T", variants.get(0).getSourceEntries(), false);
     }
 
     @Test
@@ -142,7 +141,7 @@ public class BiodataVariantToVariantContextConverterTest {
                 new BiodataVariantToVariantContextConverter(Collections.singletonList(variantSource), cellbaseWSClientStub, noSampleNamesConflictSampleNameCorrections);
         // TODO: test with region
         VariantContext variantContext = variantConverter.transform(variants.get(0), new Region("1", 1090, 1110));
-        checkVariantContext(variantContext, CHR_1, 1100, 1100, "T", "TG", variants.get(0).getSourceEntry(FILE_ID, STUDY_1).getSamplesData());
+        checkVariantContext(variantContext, CHR_1, 1100, 1100, "T", "TG", variants.get(0).getSourceEntries(), false);
     }
 
     @Test
@@ -158,7 +157,7 @@ public class BiodataVariantToVariantContextConverterTest {
                 new BiodataVariantToVariantContextConverter(Collections.singletonList(variantSource), cellbaseWSClientStub, noSampleNamesConflictSampleNameCorrections);
         // TODO: test with region
         VariantContext variantContext = variantConverter.transform(variants.get(0),new Region("1", 1090, 1110));
-        checkVariantContext(variantContext, CHR_1, 1100, 1101, "TA", "T",variants.get(0).getSourceEntry(FILE_ID, STUDY_1).getSamplesData());
+        checkVariantContext(variantContext, CHR_1, 1100, 1101, "TA", "T", variants.get(0).getSourceEntries(), false);
     }
 
     @Test(expected=IllegalStateException.class)
@@ -227,7 +226,7 @@ public class BiodataVariantToVariantContextConverterTest {
         // check transformed variant
         Set<String> sampleNames = new HashSet<>(source1.getSamples());
         sampleNames.addAll(source2.getSamples());
-//        checkVariantContext(variantContext, CHR_1, 1000, 1000, "T", "G", sampleNames);
+        checkVariantContext(variantContext, CHR_1, 1000, 1000, "T", "G", variant.getSourceEntries(), false);
     }
 
     @Test
@@ -289,7 +288,7 @@ public class BiodataVariantToVariantContextConverterTest {
         // check transformed variant
         Set<String> sampleNames = source1.getSamples().stream().map(s -> study1Entry.getStudyId() + "_" + s).collect(Collectors.toSet());
         sampleNames.addAll(source2.getSamples().stream().map(s -> study2Entry.getStudyId() + "_" + s).collect(Collectors.toSet()));
-//        checkVariantContext(variantContext, CHR_1, 1000, 1000, "T", "G", sampleNames);
+        checkVariantContext(variantContext, CHR_1, 1000, 1000, "T", "G", variant.getSourceEntries(), true);
     }
 
     // TODO: test with alleles -1|-1
@@ -345,7 +344,7 @@ public class BiodataVariantToVariantContextConverterTest {
 //    }
 
     private void checkVariantContext(VariantContext variantContext, String chromosome, int start, int end, String ref, String alt,
-                                     Map<String, Map<String, String>> samplesData) {
+                                     Map<String, VariantSourceEntry> sourceEntries, boolean sampleNameConflicts) {
         assertEquals(chromosome, variantContext.getContig());
         assertEquals(start, variantContext.getStart());
         assertEquals(end, variantContext.getEnd());
@@ -354,18 +353,31 @@ public class BiodataVariantToVariantContextConverterTest {
         assertTrue(variantContext.emptyID());
         assertTrue(variantContext.getFilters().isEmpty());
         assertEquals(0, variantContext.getCommonInfo().getAttributes().size());
-        checkGenotypes(samplesData, variantContext);
+        checkGenotypes(sourceEntries, variantContext, sampleNameConflicts);
     }
 
-    private void checkGenotypes(Map<String, Map<String, String>> samplesData, VariantContext variantContext) {
-        Set<String> sampleNames = samplesData.keySet();
-        assertEquals(sampleNames, variantContext.getSampleNames());
-        for (String sample : sampleNames) {
-            // get input and output genotypes and compare alleles
-            String inputGenotype = samplesData.get(sample).get("GT");
-            Genotype outputGenotype = variantContext.getGenotype(sample);
-            compareAlleles(inputGenotype.charAt(0), outputGenotype.getAllele(0));
-            compareAlleles(inputGenotype.charAt(2), outputGenotype.getAllele(1));
+    private void checkGenotypes(Map<String, VariantSourceEntry> sourceEntries, VariantContext variantContext, boolean sampleNameConflicts) {
+        // check that variantContext has the same number of samples than the input variant
+        int inputVariantsSampleCount = sourceEntries.values().stream().mapToInt(variantSourceEntry -> variantSourceEntry.getSamplesData().size()).sum();
+        assertEquals(inputVariantsSampleCount, variantContext.getSampleNames().size());
+
+        for (Map.Entry<String, VariantSourceEntry> sourcesMapEntry : sourceEntries.entrySet()) {
+            checkStudyGenotypes(sourcesMapEntry.getValue().getStudyId(), sourcesMapEntry.getValue(), variantContext, sampleNameConflicts);
+        }
+    }
+
+    private void checkStudyGenotypes(String studyId, VariantSourceEntry sourceEntry, VariantContext variantContext, boolean sampleNameConflicts) {
+        for (String sample : sourceEntry.getSampleNames()) {
+            String inputVariantSampleGenotype = sourceEntry.getSampleData(sample, "GT");
+            String sampleNameInOutputVariant;
+            if (sampleNameConflicts) {
+                sampleNameInOutputVariant = studyId + "_" + sample;
+            } else {
+                sampleNameInOutputVariant = sample;
+            }
+            Genotype outputVariantSampleGenotype = variantContext.getGenotype(sampleNameInOutputVariant);
+            compareAlleles(inputVariantSampleGenotype.charAt(0), outputVariantSampleGenotype.getAllele(0));
+            compareAlleles(inputVariantSampleGenotype.charAt(2), outputVariantSampleGenotype.getAllele(1));
         }
     }
 
@@ -385,15 +397,6 @@ public class BiodataVariantToVariantContextConverterTest {
         final VariantSource variantSource = new VariantSource("name", FILE_ID, studyId, "studyName");
         variantSource.setSamples(sampleList);
         return variantSource;
-    }
-
-
-    private void removeSrc(List<Variant> variants) {
-        for (Variant variant : variants) {
-            for (VariantSourceEntry variantSourceEntry : variant.getSourceEntries().values()) {
-                variantSourceEntry.getAttributes().remove("src");
-            }
-        }
     }
 
 }
