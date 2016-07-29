@@ -149,19 +149,32 @@ public class BiodataVariantToVariantContextConverter {
 
     private Set<Genotype> getStudyGenotypes(Set<Genotype> genotypes, Allele[] variantAlleles, VariantSourceEntry variantStudyEntry) {
         for (Map.Entry<String, Map<String, String>> sampleEntry : variantStudyEntry.getSamplesData().entrySet()) {
-            String gt = sampleEntry.getValue().get(GENOTYPE_KEY);
-            org.opencb.biodata.models.feature.Genotype genotype = new org.opencb.biodata.models.feature.Genotype(gt, variantAlleles[0].getBaseString(), variantAlleles[1].getBaseString());
-            List<Allele> genotypeAlleles = new ArrayList<>(2);
-            for (int index : genotype.getAllelesIdx()) {
-                if (index == -1 || index > NO_CALL_ALLELE_INDEX) {
-                    index = NO_CALL_ALLELE_INDEX;
-                }
-                genotypeAlleles.add(variantAlleles[index]);
-            }
-
-            genotypes.add(new GenotypeBuilder().name(getFixedSampleName(variantStudyEntry.getStudyId(), sampleEntry.getKey())).alleles(genotypeAlleles).make());
+            String sampleGenotypeString = sampleEntry.getValue().get(GENOTYPE_KEY);
+            Genotype sampleGenotype =
+                    parseSampleGenotype(variantAlleles, variantStudyEntry.getStudyId(), sampleEntry.getKey(), sampleGenotypeString);
+            genotypes.add(sampleGenotype);
         }
         return genotypes;
+    }
+
+    private Genotype parseSampleGenotype(Allele[] variantAlleles, String studyId, String sampleName, String sampleGenotypeString) {
+        // use opencb biodata-models Genotype class for parsing the genotype string and get the list of genotype allele indexes
+        org.opencb.biodata.models.feature.Genotype genotype =
+                new org.opencb.biodata.models.feature.Genotype(sampleGenotypeString, variantAlleles[0].getBaseString(), variantAlleles[1].getBaseString());
+        List<Allele> genotypeAlleles = new ArrayList<>(2);
+        for (int index : genotype.getAllelesIdx()) {
+            // every allele not 0 or 1 will be considered no call
+            if (index == -1 || index > NO_CALL_ALLELE_INDEX) {
+                index = NO_CALL_ALLELE_INDEX;
+            }
+            genotypeAlleles.add(variantAlleles[index]);
+        }
+
+        GenotypeBuilder builder = new GenotypeBuilder()
+                .name(getFixedSampleName(studyId, sampleName))
+                .alleles(genotypeAlleles);
+
+        return builder.make();
     }
 
     private String getFixedSampleName(String studyId, String sampleName) {
