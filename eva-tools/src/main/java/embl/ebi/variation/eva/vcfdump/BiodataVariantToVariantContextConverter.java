@@ -62,7 +62,6 @@ public class BiodataVariantToVariantContextConverter {
 
         VariantContext variantContext = variantContextBuilder
                 .chr(variant.getChromosome())
-                // TODO: check start and end for indels
                 .start(variant.getStart())
                 .stop(variant.getEnd())
                 .noID()
