@@ -76,33 +76,33 @@ public class BiodataVariantToVariantContextConverter {
         String[] allelesArray;
         // if there are indels, we cannot use the normalized alleles, (hts forbids empty alleles) so we have to take them from cellbase
         if (variant.getReference().isEmpty() || variant.getAlternate().isEmpty()) {
-            String contextNucleotide;
-            if (region != null) {
-                contextNucleotide = getContextNucleotideFromCellbaseCachingRegions(variant, variant.getStart(), region);
-            } else {
-                contextNucleotide = getContextNucleotideFromCellbase(variant, variant.getStart());
-            }
-
-            allelesArray = new String[] {contextNucleotide + variant.getReference(), contextNucleotide + variant.getAlternate()};
-            variant.setEnd(variant.getStart() + allelesArray[0].length() - 1);
-        } else {
-            allelesArray = new String[] {variant.getReference(), variant.getAlternate()};
+            String contextNucleotide = getContextNucleotideFromCellbase(variant, variant.getStart(), region);
+            // update variant ref, alt, start and end adding the context nucleotide
+            variant.setReference(contextNucleotide + variant.getReference());
+            variant.setAlternate(contextNucleotide + variant.getAlternate());
+            variant.setStart(variant.getStart() - 1);
+            variant.setEnd(variant.getStart() + variant.getReference().length() - 1);
         }
+        allelesArray = new String[] {variant.getReference(), variant.getAlternate()};
 
         return allelesArray;
     }
 
-    private String getContextNucleotideFromCellbase(Variant variant, Integer start) throws CellbaseSequenceDownloadError {
+    private String getContextNucleotideFromCellbase(Variant variant, Integer start, Region region) throws CellbaseSequenceDownloadError {
         if (cellbaseClient != null) {
             String contextNucleotide;
             int contextNucleotidePosition = start - 1;
-            try {
-                contextNucleotide = cellbaseClient.getSequence(new Region(variant.getChromosome(), contextNucleotidePosition, contextNucleotidePosition));
-                return contextNucleotide;
-            } catch (Exception e) {
-                throw new CellbaseSequenceDownloadError("Error getting from Cellbase sequence for Region " + variant.getChromosome() + ":" +
-                        contextNucleotidePosition + "-" + contextNucleotidePosition, e);
+            if (region != null) {
+                contextNucleotide = getContextNucleotideFromCellbaseCachingRegions(variant.getChromosome(), contextNucleotidePosition, region);
+            } else {
+                try {
+                    contextNucleotide = cellbaseClient.getSequence(new Region(variant.getChromosome(), contextNucleotidePosition, contextNucleotidePosition));
+                } catch (Exception e) {
+                    throw new CellbaseSequenceDownloadError("Error getting from Cellbase sequence for Region " + variant.getChromosome() + ":" +
+                            contextNucleotidePosition + "-" + contextNucleotidePosition, e);
+                }
             }
+            return contextNucleotide;
         } else {
             throw new IllegalStateException(String.format(
                     "CellBase was not provided, needed to fill empty alleles in variant %s:%d:%s>%s", variant.getChromosome(),
@@ -110,27 +110,21 @@ public class BiodataVariantToVariantContextConverter {
         }
     }
 
-    private String getContextNucleotideFromCellbaseCachingRegions(Variant variant, int start, Region region) throws CellbaseSequenceDownloadError {
-        if (cellbaseClient != null) {
-            if (regionSequence == null) {
-                // if an indel start is the first nucleotide of the region, we will need the previous nucleotide, so we are adding
-                // the preceding nucleotide to the region (region.getStart()-1)
-                int regionStart = region.getStart() - 1;
-                int regionEnd = region.getEnd();
-                try {
-                    regionSequence = cellbaseClient.getSequence(new Region(variant.getChromosome(), regionStart, regionEnd));
-                } catch (Exception e) {
-                    throw new CellbaseSequenceDownloadError("Error getting from Cellbase sequence for Region " + variant.getChromosome() +
-                            ":" + regionStart + "-" + regionEnd, e);
-                }
+    private String getContextNucleotideFromCellbaseCachingRegions(String chromosome, int start, Region region) throws CellbaseSequenceDownloadError {
+        if (regionSequence == null) {
+            // if an indel start is the first nucleotide of the region, we will need the previous nucleotide, so we are adding
+            // the preceding nucleotide to the region (region.getStart()-1)
+            int regionStart = region.getStart() - 1;
+            int regionEnd = region.getEnd();
+            try {
+                regionSequence = cellbaseClient.getSequence(new Region(chromosome, regionStart, regionEnd));
+            } catch (Exception e) {
+                throw new CellbaseSequenceDownloadError("Error getting from Cellbase sequence for Region " + chromosome + ":"
+                        + regionStart + "-" + regionEnd, e);
             }
-            String nucleotide = getNucleotideFromRegionSequence(start, region.getStart(), regionSequence);
-            return nucleotide;
-        } else {
-            throw new IllegalStateException(String.format(
-                    "CellBase was not provided, needed to fill empty alleles in variant %s:%d:%s>%s",
-                    variant.getChromosome(), variant.getStart(), variant.getReference(), variant.getAlternate()));
         }
+        String nucleotide = getNucleotideFromRegionSequence(start, region.getStart(), regionSequence);
+        return nucleotide;
     }
 
     private String getNucleotideFromRegionSequence(int start, int regionStart, String regionSequence) {

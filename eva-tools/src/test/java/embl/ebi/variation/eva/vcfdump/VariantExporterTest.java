@@ -411,7 +411,7 @@ public class VariantExporterTest {
     }
 
     private static boolean sameVariant(Variant v1, VariantContext v2) {
-        if (v2.getContig().equals(v1.getChromosome()) && v2.getStart() == v1.getStart()) {
+        if (v2.getContig().equals(v1.getChromosome()) && sameStart(v1, v2)) {
             if (v1.getReference().equals("")) {
                 // insertion
                 return v2.getAlternateAlleles().contains(Allele.create(v2.getReference().getBaseString() + v1.getAlternate()));
@@ -423,6 +423,14 @@ public class VariantExporterTest {
             }
         }
         return false;
+    }
+
+    private static boolean sameStart(Variant v1, VariantContext v2) {
+        if (v1.getReference().equals("") || v1.getAlternate().equals("")) {
+            return v2.getStart() == (v1.getStart() - 1);
+        } else {
+            return v2.getStart() == v1.getStart();
+        }
     }
 
     private VariantSource createTestVariantSource(String studyId, List<String> sampleList) {
