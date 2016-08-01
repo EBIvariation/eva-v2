@@ -144,7 +144,6 @@ public class VariantExporterControllerTest {
         String studyId = "PRJEB6119";
         List<String> studies = Collections.singletonList(studyId);
 
-        // TODO: another test with query parameters
         VariantExporterController controller = new VariantExporterController("btaurus", VariantExporterTestDB.COW_TEST_DB_NAME, studies, OUTPUT_DIR, emptyFilter);
         controller.run();
 
@@ -182,7 +181,7 @@ public class VariantExporterControllerTest {
         String studyId = "7";
         List<String> studies = Collections.singletonList(studyId);
 
-        // TODO: use a different filter that can be set from the variant browser
+        // TODO: use a different filter that can be set from the variant browser, like annotation
         MultivaluedMap<String, String> filter = new MultivaluedHashMap<>();
         filter.putSingle(VariantDBAdaptor.REGION, "20:61000-69000");
         filter.putSingle(VariantDBAdaptor.REFERENCE, "A");
