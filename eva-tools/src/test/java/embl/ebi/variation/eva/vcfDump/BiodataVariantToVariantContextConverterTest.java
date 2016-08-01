@@ -233,6 +233,8 @@ public class BiodataVariantToVariantContextConverterTest {
         // studies and samples names
         String study1 = "study_1";
         String study2 = "study_2";
+        String file1 = "file_1";
+        String file2 = "file_2";
         String sampleX1 = "SX_1";
         String sampleX2 = "SX_2";
         String sampleX3 = "SX_3";
@@ -242,48 +244,48 @@ public class BiodataVariantToVariantContextConverterTest {
 
         // sample name corrections map (usually created by VariantExporter)
         Map<String, Map<String, String>> sampleNamesCorrections = new HashMap<>();
-        Map<String, String> study1SampleNameCorrections = new HashMap<>();
-        study1SampleNameCorrections.put(sampleX1, study1 + "_" + sampleX1);
-        study1SampleNameCorrections.put(sampleX2, study1 + "_" + sampleX2);
-        study1SampleNameCorrections.put(sampleX3, study1 + "_" + sampleX3);
-        study1SampleNameCorrections.put(sampleX4, study1 + "_" + sampleX4);
-        sampleNamesCorrections.put(study1, study1SampleNameCorrections);
-        Map<String, String> study2SampleNameCorrections = new HashMap<>();
-        study2SampleNameCorrections.put(sampleX1, study2 + "_" + sampleX1);
-        study2SampleNameCorrections.put(sampleX2, study2 + "_" + sampleX2);
-        study2SampleNameCorrections.put(sampleX3, study2 + "_" + sampleX3);
-        study2SampleNameCorrections.put(sampleX4, study2 + "_" + sampleX4);
-        study2SampleNameCorrections.put(sampleX5, study2 + "_" + sampleX5);
-        study2SampleNameCorrections.put(sampleX6, study2 + "_" + sampleX6);
-        sampleNamesCorrections.put(study2, study2SampleNameCorrections);
+        Map<String, String> file1SampleNameCorrections = new HashMap<>();
+        file1SampleNameCorrections.put(sampleX1, file1 + "_" + sampleX1);
+        file1SampleNameCorrections.put(sampleX2, file1 + "_" + sampleX2);
+        file1SampleNameCorrections.put(sampleX3, file1 + "_" + sampleX3);
+        file1SampleNameCorrections.put(sampleX4, file1 + "_" + sampleX4);
+        sampleNamesCorrections.put(file1, file1SampleNameCorrections);
+        Map<String, String> file2SampleNameCorrections = new HashMap<>();
+        file2SampleNameCorrections.put(sampleX1, file2 + "_" + sampleX1);
+        file2SampleNameCorrections.put(sampleX2, file2 + "_" + sampleX2);
+        file2SampleNameCorrections.put(sampleX3, file2 + "_" + sampleX3);
+        file2SampleNameCorrections.put(sampleX4, file2 + "_" + sampleX4);
+        file2SampleNameCorrections.put(sampleX5, file2 + "_" + sampleX5);
+        file2SampleNameCorrections.put(sampleX6, file2 + "_" + sampleX6);
+        sampleNamesCorrections.put(file2, file2SampleNameCorrections);
 
         // variant sources
-        VariantSource source1 = new VariantSource("testFile1", "file_1", study1, "testStudy1");
+        VariantSource source1 = new VariantSource("testFile1", file1, study1, "testStudy1");
         source1.setSamples(Arrays.asList(sampleX1, sampleX2, sampleX3, sampleX4));
-        VariantSourceEntry study1Entry = new VariantSourceEntry("file_1", study1);
-        addGenotype(study1Entry, sampleX1, "0|0");
-        addGenotype(study1Entry, sampleX2, "0|1");
-        addGenotype(study1Entry, sampleX3, "0|1");
-        addGenotype(study1Entry, sampleX4, "0|0");
-        variant.addSourceEntry(study1Entry);
-        VariantSource source2 = new VariantSource("testFile2", "file_2", study2, "testStudy2");
+        VariantSourceEntry source1Entry = new VariantSourceEntry(file1, study1);
+        addGenotype(source1Entry, sampleX1, "0|0");
+        addGenotype(source1Entry, sampleX2, "0|1");
+        addGenotype(source1Entry, sampleX3, "0|1");
+        addGenotype(source1Entry, sampleX4, "0|0");
+        variant.addSourceEntry(source1Entry);
+        VariantSource source2 = new VariantSource("testFile2", file2, study2, "testStudy2");
         source2.setSamples(Arrays.asList(sampleX1, sampleX2, sampleX3, sampleX4, sampleX5, sampleX6));
-        VariantSourceEntry study2Entry = new VariantSourceEntry("file_2", study2);
-        addGenotype(study2Entry, sampleX1, "0|0");
-        addGenotype(study2Entry, sampleX2, "1|0");
-        addGenotype(study2Entry, sampleX3, "1|1");
-        addGenotype(study2Entry, sampleX4, "1|1");
-        addGenotype(study2Entry, sampleX5, "0|0");
-        addGenotype(study2Entry, sampleX6, "1|0");
-        variant.addSourceEntry(study2Entry);
+        VariantSourceEntry source2Entry = new VariantSourceEntry(file2, study2);
+        addGenotype(source2Entry, sampleX1, "0|0");
+        addGenotype(source2Entry, sampleX2, "1|0");
+        addGenotype(source2Entry, sampleX3, "1|1");
+        addGenotype(source2Entry, sampleX4, "1|1");
+        addGenotype(source2Entry, sampleX5, "0|0");
+        addGenotype(source2Entry, sampleX6, "1|0");
+        variant.addSourceEntry(source2Entry);
 
         // transform variant
         BiodataVariantToVariantContextConverter variantConverter = new BiodataVariantToVariantContextConverter(Arrays.asList(source1, source2), cellbaseWSClientStub, sampleNamesCorrections);
         VariantContext variantContext = variantConverter.transform(variant, null);
 
         // check transformed variant
-        Set<String> sampleNames = source1.getSamples().stream().map(s -> study1Entry.getStudyId() + "_" + s).collect(Collectors.toSet());
-        sampleNames.addAll(source2.getSamples().stream().map(s -> study2Entry.getStudyId() + "_" + s).collect(Collectors.toSet()));
+        Set<String> sampleNames = source1.getSamples().stream().map(s -> source1Entry.getFileId() + "_" + s).collect(Collectors.toSet());
+        sampleNames.addAll(source2.getSamples().stream().map(s -> source2Entry.getFileId() + "_" + s).collect(Collectors.toSet()));
         checkVariantContext(variantContext, CHR_1, 1000, 1000, "T", "G", variant.getSourceEntries(), true);
     }
 
@@ -358,16 +360,16 @@ public class BiodataVariantToVariantContextConverterTest {
         assertEquals(inputVariantsSampleCount, variantContext.getSampleNames().size());
 
         for (Map.Entry<String, VariantSourceEntry> sourcesMapEntry : sourceEntries.entrySet()) {
-            checkStudyGenotypes(sourcesMapEntry.getValue().getStudyId(), sourcesMapEntry.getValue(), variantContext, sampleNameConflicts);
+            checkStudyGenotypes(sourcesMapEntry.getValue().getFileId(), sourcesMapEntry.getValue(), variantContext, sampleNameConflicts);
         }
     }
 
-    private void checkStudyGenotypes(String studyId, VariantSourceEntry sourceEntry, VariantContext variantContext, boolean sampleNameConflicts) {
+    private void checkStudyGenotypes(String fileId, VariantSourceEntry sourceEntry, VariantContext variantContext, boolean sampleNameConflicts) {
         for (String sample : sourceEntry.getSampleNames()) {
             String inputVariantSampleGenotype = sourceEntry.getSampleData(sample, "GT");
             String sampleNameInOutputVariant;
             if (sampleNameConflicts) {
-                sampleNameInOutputVariant = studyId + "_" + sample;
+                sampleNameInOutputVariant = fileId + "_" + sample;
             } else {
                 sampleNameInOutputVariant = sample;
             }

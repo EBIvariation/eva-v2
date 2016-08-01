@@ -64,9 +64,9 @@ public class VariantExporterTest {
     private static ArrayList<String> s1s6SampleList;
     private static ArrayList<String> s2s3SampleList;
     private static ArrayList<String> c1c6SampleList;
-    private static final String STUDY_1 = "study_1";
-    private static final String STUDY_2 = "study_2";
-    private static final String STUDY_3 = "study_3";
+    private static final String FILE_1 = "file_1";
+    private static final String FILE_2 = "file_2";
+    private static final String FILE_3 = "file_3";
 
     /**
      * Clears and populates the Mongo collection used during the tests.
@@ -156,9 +156,9 @@ public class VariantExporterTest {
 
     @Test
     public void checkSampleNamesConflicts() {
-        VariantSource variantSource = createTestVariantSource(STUDY_1, s1s6SampleList);
-        VariantSource variantSource2 = createTestVariantSource(STUDY_2, c1c6SampleList);
-        VariantSource variantSource3 = createTestVariantSource(STUDY_3, s2s3SampleList);
+        VariantSource variantSource = createTestVariantSource(FILE_1, s1s6SampleList);
+        VariantSource variantSource2 = createTestVariantSource(FILE_2, c1c6SampleList);
+        VariantSource variantSource3 = createTestVariantSource(FILE_3, s2s3SampleList);
 
         VariantExporter variantExporter = new VariantExporter(null);
 
@@ -169,16 +169,16 @@ public class VariantExporterTest {
         assertNull(variantExporter.createNonConflictingSampleNames((Arrays.asList(variantSource2, variantSource3))));
 
         // sutdy 1 and 3 share sample some names
-        Map<String, Map<String, String>> study1And3SampleNameTranslations = variantExporter.createNonConflictingSampleNames((Arrays.asList(variantSource, variantSource3)));
-        s1s6SampleList.forEach(sampleName -> study1And3SampleNameTranslations.get(STUDY_1).get(sampleName).equals(STUDY_1 + "_" + sampleName));
-        s2s3SampleList.forEach(sampleName -> study1And3SampleNameTranslations.get(STUDY_3).get(sampleName).equals(STUDY_3 + "_" + sampleName));
+        Map<String, Map<String, String>> file1And3SampleNameTranslations = variantExporter.createNonConflictingSampleNames((Arrays.asList(variantSource, variantSource3)));
+        s1s6SampleList.forEach(sampleName -> file1And3SampleNameTranslations.get(FILE_1).get(sampleName).equals(FILE_1 + "_" + sampleName));
+        s2s3SampleList.forEach(sampleName -> file1And3SampleNameTranslations.get(FILE_3).get(sampleName).equals(FILE_3 + "_" + sampleName));
 
 
         // sutdy 1 and 3 (but not 2) share sample some names
-        Map<String, Map<String, String>> study1And2And3SampleNameTranslations = variantExporter.createNonConflictingSampleNames((Arrays.asList(variantSource, variantSource2, variantSource3)));
-        s1s6SampleList.forEach(sampleName -> study1And2And3SampleNameTranslations.get(STUDY_1).get(sampleName).equals(STUDY_1 + "_" + sampleName));
-        c1c6SampleList.forEach(sampleName -> study1And2And3SampleNameTranslations.get(STUDY_2).get(sampleName).equals(STUDY_2 + "_" + sampleName));
-        s2s3SampleList.forEach(sampleName -> study1And2And3SampleNameTranslations.get(STUDY_3).get(sampleName).equals(STUDY_3 + "_" + sampleName));
+        Map<String, Map<String, String>> file1And2And3SampleNameTranslations = variantExporter.createNonConflictingSampleNames((Arrays.asList(variantSource, variantSource2, variantSource3)));
+        s1s6SampleList.forEach(sampleName -> file1And2And3SampleNameTranslations.get(FILE_1).get(sampleName).equals(FILE_1 + "_" + sampleName));
+        c1c6SampleList.forEach(sampleName -> file1And2And3SampleNameTranslations.get(FILE_2).get(sampleName).equals(FILE_2 + "_" + sampleName));
+        s2s3SampleList.forEach(sampleName -> file1And2And3SampleNameTranslations.get(FILE_3).get(sampleName).equals(FILE_3 + "_" + sampleName));
     }
 
     @Test
@@ -309,8 +309,8 @@ public class VariantExporterTest {
         }
     }
 
-    private VariantSource createTestVariantSource(String studyId, List<String> sampleList) {
-        final VariantSource variantSource = new VariantSource("name", "fileId", studyId, "studyName");
+    private VariantSource createTestVariantSource(String fileId, List<String> sampleList) {
+        final VariantSource variantSource = new VariantSource("name", fileId, "studyId", "studyName");
         variantSource.setSamples(sampleList);
         return variantSource;
     }

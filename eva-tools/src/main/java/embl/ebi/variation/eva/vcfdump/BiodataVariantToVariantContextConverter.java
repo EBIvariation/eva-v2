@@ -39,7 +39,7 @@ public class BiodataVariantToVariantContextConverter {
     private List<VariantSource> sources;
     private CellbaseWSClient cellbaseClient;
     private String regionSequence;
-    private Map<String, Map<String,String>> studiesSampleNamesEquivalences;
+    private Map<String, Map<String,String>> filesSampleNamesEquivalences;
     private static final int NO_CALL_ALLELE_INDEX = 2;
 
     public BiodataVariantToVariantContextConverter(CellbaseWSClient cellbaseWSClient) {
@@ -47,11 +47,11 @@ public class BiodataVariantToVariantContextConverter {
     }
 
     public BiodataVariantToVariantContextConverter(List<VariantSource> sources, CellbaseWSClient cellbaseWSClient,
-                                                   Map<String, Map<String,String>> studiesSampleNamesEquivalences)
+                                                   Map<String, Map<String,String>> filesSampleNamesEquivalences)
     {
         this.sources = sources;
         this.cellbaseClient = cellbaseWSClient;
-        this.studiesSampleNamesEquivalences = studiesSampleNamesEquivalences;
+        this.filesSampleNamesEquivalences = filesSampleNamesEquivalences;
         variantContextBuilder = new VariantContextBuilder();
     }
 
@@ -151,13 +151,13 @@ public class BiodataVariantToVariantContextConverter {
         for (Map.Entry<String, Map<String, String>> sampleEntry : variantStudyEntry.getSamplesData().entrySet()) {
             String sampleGenotypeString = sampleEntry.getValue().get(GENOTYPE_KEY);
             Genotype sampleGenotype =
-                    parseSampleGenotype(variantAlleles, variantStudyEntry.getStudyId(), sampleEntry.getKey(), sampleGenotypeString);
+                    parseSampleGenotype(variantAlleles, variantStudyEntry.getFileId(), sampleEntry.getKey(), sampleGenotypeString);
             genotypes.add(sampleGenotype);
         }
         return genotypes;
     }
 
-    private Genotype parseSampleGenotype(Allele[] variantAlleles, String studyId, String sampleName, String sampleGenotypeString) {
+    private Genotype parseSampleGenotype(Allele[] variantAlleles, String fileId, String sampleName, String sampleGenotypeString) {
         // use opencb biodata-models Genotype class for parsing the genotype string and get the list of genotype allele indexes
         org.opencb.biodata.models.feature.Genotype genotype =
                 new org.opencb.biodata.models.feature.Genotype(sampleGenotypeString, variantAlleles[0].getBaseString(), variantAlleles[1].getBaseString());
@@ -171,16 +171,16 @@ public class BiodataVariantToVariantContextConverter {
         }
 
         GenotypeBuilder builder = new GenotypeBuilder()
-                .name(getFixedSampleName(studyId, sampleName))
+                .name(getFixedSampleName(fileId, sampleName))
                 .alleles(genotypeAlleles);
 
         return builder.make();
     }
 
-    private String getFixedSampleName(String studyId, String sampleName) {
+    private String getFixedSampleName(String fileId, String sampleName) {
         // this method returns the "studyId appended" sample name if there are sample name conflicts
-        if (studiesSampleNamesEquivalences != null) {
-            return studiesSampleNamesEquivalences.get(studyId).get(sampleName);
+        if (filesSampleNamesEquivalences != null) {
+            return filesSampleNamesEquivalences.get(fileId).get(sampleName);
         } else {
             return sampleName;
         }
@@ -194,7 +194,7 @@ public class BiodataVariantToVariantContextConverter {
         this.sources = sources;
     }
 
-    public void setStudiesSampleNamesEquivalences(Map<String, Map<String, String>> studiesSampleNamesEquivalences) {
-        this.studiesSampleNamesEquivalences = studiesSampleNamesEquivalences;
+    public void setFilesSampleNamesEquivalences(Map<String, Map<String, String>> filesSampleNamesEquivalences) {
+        this.filesSampleNamesEquivalences = filesSampleNamesEquivalences;
     }
 }

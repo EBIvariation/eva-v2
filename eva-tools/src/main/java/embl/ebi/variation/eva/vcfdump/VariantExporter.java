@@ -103,7 +103,7 @@ public class VariantExporter {
 
         // check if there are conflicts in sample names and create new ones if needed
         Map<String, Map<String, String>> studiesSampleNamesMapping = createNonConflictingSampleNames(sourcesList);
-        variantToVariantContextConverter.setStudiesSampleNamesEquivalences(studiesSampleNamesMapping);
+        variantToVariantContextConverter.setFilesSampleNamesEquivalences(studiesSampleNamesMapping);
 
         return sources;
     }
@@ -117,7 +117,7 @@ public class VariantExporter {
     }
 
     public Map<String, Map<String, String>> createNonConflictingSampleNames(Collection<VariantSource> sources) {
-        Map<String, Map<String, String>> studiesSampleNamesMapping = null;
+        Map<String, Map<String, String>> filesSampleNamesMapping = null;
 
         // create a list containing the sample names of every input study
         // if a sample name is in more than one study, it will be several times in the list)
@@ -127,7 +127,7 @@ public class VariantExporter {
             // if there are several studies, check if there are duplicate elements
             someSampleNameInMoreThanOneStudy = originalSampleNames.stream().anyMatch(s -> Collections.frequency(originalSampleNames, s) > 1);
             if (someSampleNameInMoreThanOneStudy) {
-                studiesSampleNamesMapping = resolveConflictsInSampleNamesPrefixingStudyId(sources);
+                filesSampleNamesMapping = resolveConflictsInSampleNamesPrefixingFileId(sources);
             }
         }
 
@@ -135,24 +135,24 @@ public class VariantExporter {
             outputSampleNames.addAll(originalSampleNames);
         }
 
-        return studiesSampleNamesMapping;
+        return filesSampleNamesMapping;
     }
 
-    private Map<String, Map<String, String>> resolveConflictsInSampleNamesPrefixingStudyId(Collection<VariantSource> sources) {
+    private Map<String, Map<String, String>> resolveConflictsInSampleNamesPrefixingFileId(Collection<VariantSource> sources) {
         // each study will have a map translating from original sample name to "conflict free" one
-        Map<String, Map<String, String>> studiesSampleNamesMapping = new HashMap<>();
+        Map<String, Map<String, String>> filesSampleNamesMapping = new HashMap<>();
         for (VariantSource source : sources) {
             // create a map from original to "conflict free" sample name (prefixing with study id)
-            Map<String, String> studySampleNamesMapping = new HashMap<>();
-            source.getSamples().stream().forEach(name -> studySampleNamesMapping.put(name, source.getStudyId() + "_" + name));
+            Map<String, String> fileSampleNamesMapping = new HashMap<>();
+            source.getSamples().stream().forEach(name -> fileSampleNamesMapping.put(name, source.getFileId() + "_" + name));
 
             // add "conflict free" names to output sample names set
-            outputSampleNames.addAll(studySampleNamesMapping.values());
+            outputSampleNames.addAll(fileSampleNamesMapping.values());
 
             // add study map to the "super map" containing all studies
-            studiesSampleNamesMapping.put(source.getStudyId(), studySampleNamesMapping);
+            filesSampleNamesMapping.put(source.getFileId(), fileSampleNamesMapping);
         }
-        return studiesSampleNamesMapping;
+        return filesSampleNamesMapping;
     }
 
     /**
