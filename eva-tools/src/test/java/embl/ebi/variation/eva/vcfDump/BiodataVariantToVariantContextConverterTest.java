@@ -64,7 +64,7 @@ public class BiodataVariantToVariantContextConverterTest {
                 } else if (region.getChromosome().equals(CHR_1) && region.getStart() == 1000 && region.getEnd() == 1000) {
                     return "C";
                 } else if (region.getChromosome().equals(CHR_1) && region.getStart() == 1089 && region.getEnd() == 1110) {
-                    return "AATGTCTGCATAGCACGTTGAC";
+                    return "AATGTCTGCACTAGCACGTTGA";
                 }
                 return null;
             }

@@ -109,11 +109,11 @@ public class BiodataVariantToVariantContextConverter {
         }
     }
 
-    private String getContextNucleotideFromCellbaseCachingRegions(String chromosome, int start, Region region) throws CellbaseSequenceDownloadError {
+    private String getContextNucleotideFromCellbaseCachingRegions(String chromosome, int contextNucleotidePosition, Region region) throws CellbaseSequenceDownloadError {
+        int regionStart = region.getStart() - 1;
         if (regionSequence == null) {
             // if an indel start is the first nucleotide of the region, we will need the previous nucleotide, so we are adding
             // the preceding nucleotide to the region (region.getStart()-1)
-            int regionStart = region.getStart() - 1;
             int regionEnd = region.getEnd();
             try {
                 regionSequence = cellbaseClient.getSequence(new Region(chromosome, regionStart, regionEnd));
@@ -122,12 +122,12 @@ public class BiodataVariantToVariantContextConverter {
                         + regionStart + "-" + regionEnd, e);
             }
         }
-        String nucleotide = getNucleotideFromRegionSequence(start, region.getStart(), regionSequence);
+        String nucleotide = getNucleotideFromRegionSequence(contextNucleotidePosition, regionStart, regionSequence);
         return nucleotide;
     }
 
-    private String getNucleotideFromRegionSequence(int start, int regionStart, String regionSequence) {
-        int relativePosition = start - regionStart;
+    private String getNucleotideFromRegionSequence(int nucleotidePosition, int regionStart, String regionSequence) {
+        int relativePosition = nucleotidePosition - regionStart;
         return regionSequence.substring(relativePosition, relativePosition + 1);
     }
 

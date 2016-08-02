@@ -177,14 +177,12 @@ public class VariantExporterControllerTest {
     }
 
     @Test
-    public void testFilter() throws Exception {
+    public void testConsequenceTypeFilter() throws Exception {
         String studyId = "7";
         List<String> studies = Collections.singletonList(studyId);
 
-        // TODO: use a different filter that can be set from the variant browser, like annotation
         MultivaluedMap<String, String> filter = new MultivaluedHashMap<>();
-        filter.putSingle(VariantDBAdaptor.REGION, "20:61000-69000");
-        filter.putSingle(VariantDBAdaptor.REFERENCE, "A");
+        filter.putSingle(VariantDBAdaptor.ANNOT_CONSEQUENCE_TYPE, "1627");
         VariantExporterController controller = new VariantExporterController("hsapiens", DB_NAME, studies, OUTPUT_DIR, filter);
         controller.run();
 
@@ -192,15 +190,34 @@ public class VariantExporterControllerTest {
         String outputFile = controller.getOuputFilePath();
         testOutputFiles.add(outputFile);
         assertEquals(0, controller.getFailedVariants());   // test file should not have failed variants
-
-        QueryOptions query = getQuery(studies);
-        query.put(VariantDBAdaptor.REGION, "20:61000-69000");
-        query.put(VariantDBAdaptor.REFERENCE, "A");
+        QueryOptions query = controller.getQuery(filter);
         VariantDBIterator iterator = variantDBAdaptor.iterator(query);
         assertEqualLinesFilesAndDB(outputFile, iterator);
-
         checkOrderInOutputFile(outputFile);
     }
+
+    @Test
+    public void testConsequenceTypeAndRegionFilter() throws Exception {
+        String studyId = "7";
+        List<String> studies = Collections.singletonList(studyId);
+
+        MultivaluedMap<String, String> filter = new MultivaluedHashMap<>();
+        filter.putSingle(VariantDBAdaptor.REGION, "20:60000-61000");
+        filter.putSingle(VariantDBAdaptor.ANNOT_CONSEQUENCE_TYPE, "1627");
+        VariantExporterController controller = new VariantExporterController("hsapiens", DB_NAME, studies, OUTPUT_DIR, filter);
+        controller.run();
+
+        ////////// checks
+        String outputFile = controller.getOuputFilePath();
+        testOutputFiles.add(outputFile);
+        assertEquals(0, controller.getFailedVariants());   // test file should not have failed variants
+        QueryOptions query = controller.getQuery(filter);
+        VariantDBIterator iterator = variantDBAdaptor.iterator(query);
+        assertEqualLinesFilesAndDB(outputFile, iterator);
+        checkOrderInOutputFile(outputFile);
+    }
+
+
 
     @Test
     public void testFilterUsingIntersectingRegions() throws Exception {
