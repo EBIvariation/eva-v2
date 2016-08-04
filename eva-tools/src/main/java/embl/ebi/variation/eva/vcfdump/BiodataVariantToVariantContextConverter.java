@@ -172,6 +172,7 @@ public class BiodataVariantToVariantContextConverter {
 
         GenotypeBuilder builder = new GenotypeBuilder()
                 .name(getFixedSampleName(fileId, sampleName))
+                .phased(genotype.isPhased())
                 .alleles(genotypeAlleles);
 
         return builder.make();

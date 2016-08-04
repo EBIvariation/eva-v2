@@ -347,13 +347,15 @@ public class BiodataVariantToVariantContextConverterTest {
                 sampleNameInOutputVariant = sample;
             }
             Genotype outputVariantSampleGenotype = variantContext.getGenotype(sampleNameInOutputVariant);
-            compareAlleles(inputVariantSampleGenotype.charAt(0), outputVariantSampleGenotype.getAllele(0));
-            compareAlleles(inputVariantSampleGenotype.charAt(2), outputVariantSampleGenotype.getAllele(1));
+            String[] inputAlleles = inputVariantSampleGenotype.split("/|\\|");
+            compareAlleles(Integer.valueOf(inputAlleles[0]), outputVariantSampleGenotype.getAllele(0));
+            compareAlleles(Integer.valueOf(inputAlleles[1]), outputVariantSampleGenotype.getAllele(1));
+            assertEquals(inputVariantSampleGenotype.charAt(inputAlleles[0].length()) == '|', outputVariantSampleGenotype.isPhased());
         }
     }
 
-    private void compareAlleles(char inputAlleleIndex, Allele allele) {
-        if (inputAlleleIndex == '0') {
+    private void compareAlleles(int inputAlleleIndex, Allele allele) {
+        if (inputAlleleIndex == 0) {
             assertTrue(allele.isReference());
         } else {
             assertTrue(allele.isNonReference());
