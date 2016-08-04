@@ -19,13 +19,10 @@ import embl.ebi.variation.eva.vcfdump.cellbasewsclient.CellbaseWSClient;
 import htsjdk.tribble.FeatureCodecHeader;
 import htsjdk.tribble.readers.LineIterator;
 import htsjdk.variant.variantcontext.*;
-import htsjdk.variant.vcf.VCFCodec;
-import htsjdk.variant.vcf.VCFFilterHeaderLine;
-import htsjdk.variant.vcf.VCFHeader;
+import htsjdk.variant.vcf.*;
 import org.opencb.biodata.models.feature.Region;
 import org.opencb.biodata.models.variant.Variant;
 import org.opencb.biodata.models.variant.VariantSource;
-import org.opencb.biodata.models.variant.VariantSourceEntry;
 import org.opencb.datastore.core.QueryOptions;
 import org.opencb.opencga.storage.core.variant.adaptors.VariantDBIterator;
 import org.opencb.opencga.storage.core.variant.adaptors.VariantSourceDBAdaptor;
@@ -36,6 +33,7 @@ import org.slf4j.LoggerFactory;
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.util.*;
+import java.util.stream.Collectors;
 
 /**
  * Created by jmmut on 2015-10-28.
@@ -52,7 +50,8 @@ public class VariantExporter {
      * VariantExporter to dump several VCFs. If you just want to count on one dump, use a `new VariantExporter` each time.
      */
     private int failedVariants;
-    private String regionSequence;
+    private BiodataVariantToVariantContextConverter variantToVariantContextConverter;
+    private Set<String> outputSampleNames;
 
     /**
      * if the variants will have empty alleles (such as normalized deletions: "A" to "") CellBase is mandatory to
@@ -65,24 +64,23 @@ public class VariantExporter {
      */
     public VariantExporter(CellbaseWSClient cellbaseClient) {
         this.cellbaseClient = cellbaseClient;
+        outputSampleNames = new HashSet<>();
+        variantToVariantContextConverter = new BiodataVariantToVariantContextConverter(cellbaseClient);
     }
 
-    public Map<String, List<VariantContext>> export(VariantDBIterator iterator, Region region, List<String> studyIds) {
-        Map<String, List<VariantContext>> variantsToExportByStudy = new HashMap<>();
+    public List<VariantContext> export(VariantDBIterator iterator, Region region) {
+        List<VariantContext> variantsToExport = new ArrayList<>();
         failedVariants = 0;
 
         // region sequence contains the last exported region: we set it to null to get the new region sequence from cellbase if needed
-        regionSequence = null;
+        variantToVariantContextConverter.cleanCachedRegionSequence();
 
         while (iterator.hasNext()) {
             Variant variant = iterator.next();
             if (region.contains(variant.getChromosome(), variant.getStart())) {
                 try {
-                    Map<String, VariantContext> variantContexts = convertBiodataVariantToVariantContext(variant, studyIds, region);
-                    for (Map.Entry<String, VariantContext> variantContext : variantContexts.entrySet()) {
-                        variantsToExportByStudy.putIfAbsent(variantContext.getKey(), new ArrayList<>());
-                        variantsToExportByStudy.get(variantContext.getKey()).add(variantContext.getValue());
-                    }
+                    VariantContext variantContext = variantToVariantContextConverter.transform(variant, region);
+                    variantsToExport.add(variantContext);
                 } catch (Exception e) {
                     logger.warn("Variant {}:{}:{}>{} dump failed: {}", variant.getChromosome(), variant.getStart(), variant.getReference(),
                             variant.getAlternate(), e.getMessage());
@@ -90,16 +88,71 @@ public class VariantExporter {
                 }
             }
         }
-        return variantsToExportByStudy;
+        return variantsToExport;
     }
 
-    public Map<String, VariantSource> getSources(VariantSourceDBAdaptor sourceDBAdaptor, List<String> studyIds) {
+    public Map<String, VariantSource> getSources(VariantSourceDBAdaptor sourceDBAdaptor, List<String> studyIds) throws IllegalArgumentException {
+        // get sources
         Map<String, VariantSource> sources = new TreeMap<>();
         List<VariantSource> sourcesList = sourceDBAdaptor.getAllSourcesByStudyIds(studyIds, new QueryOptions()).getResult();
+        checkIfThereAreSourceForEveryStudy(studyIds, sourcesList);
+        variantToVariantContextConverter.setSources(sourcesList);
         for (VariantSource variantSource : sourcesList) {
             sources.put(variantSource.getStudyId(), variantSource);
         }
+
+        // check if there are conflicts in sample names and create new ones if needed
+        Map<String, Map<String, String>> studiesSampleNamesMapping = createNonConflictingSampleNames(sourcesList);
+        variantToVariantContextConverter.setFilesSampleNamesEquivalences(studiesSampleNamesMapping);
+
         return sources;
+    }
+
+    private void checkIfThereAreSourceForEveryStudy(List<String> studyIds, List<VariantSource> sourcesList) throws IllegalArgumentException {
+        List<String> missingStudies =
+                studyIds.stream().filter(study -> sourcesList.stream().noneMatch(source -> source.getStudyId().equals(study))).collect(Collectors.toList());
+        if (!missingStudies.isEmpty()) {
+            throw new IllegalArgumentException("Study(ies) " + String.join(", ", missingStudies) + " not found");
+        }
+    }
+
+    public Map<String, Map<String, String>> createNonConflictingSampleNames(Collection<VariantSource> sources) {
+        Map<String, Map<String, String>> filesSampleNamesMapping = null;
+
+        // create a list containing the sample names of every input study
+        // if a sample name is in more than one study, it will be several times in the list)
+        List<String> originalSampleNames = sources.stream().map(VariantSource::getSamples).flatMap(l -> l.stream()).collect(Collectors.toList());
+        boolean someSampleNameInMoreThanOneStudy = false;
+        if (sources.size() > 1) {
+            // if there are several studies, check if there are duplicate elements
+            someSampleNameInMoreThanOneStudy = originalSampleNames.stream().anyMatch(s -> Collections.frequency(originalSampleNames, s) > 1);
+            if (someSampleNameInMoreThanOneStudy) {
+                filesSampleNamesMapping = resolveConflictsInSampleNamesPrefixingFileId(sources);
+            }
+        }
+
+        if (!someSampleNameInMoreThanOneStudy) {
+            outputSampleNames.addAll(originalSampleNames);
+        }
+
+        return filesSampleNamesMapping;
+    }
+
+    private Map<String, Map<String, String>> resolveConflictsInSampleNamesPrefixingFileId(Collection<VariantSource> sources) {
+        // each study will have a map translating from original sample name to "conflict free" one
+        Map<String, Map<String, String>> filesSampleNamesMapping = new HashMap<>();
+        for (VariantSource source : sources) {
+            // create a map from original to "conflict free" sample name (prefixing with study id)
+            Map<String, String> fileSampleNamesMapping = new HashMap<>();
+            source.getSamples().stream().forEach(name -> fileSampleNamesMapping.put(name, source.getFileId() + "_" + name));
+
+            // add "conflict free" names to output sample names set
+            outputSampleNames.addAll(fileSampleNamesMapping.values());
+
+            // add study map to the "super map" containing all studies
+            filesSampleNamesMapping.put(source.getFileId(), fileSampleNamesMapping);
+        }
+        return filesSampleNamesMapping;
     }
 
     /**
@@ -119,7 +172,6 @@ public class VariantExporter {
                 LineIterator sourceFromStream = vcfCodec.makeSourceFromStream(bufferedInputStream);
                 FeatureCodecHeader featureCodecHeader = vcfCodec.readHeader(sourceFromStream);
                 VCFHeader headerValue = (VCFHeader) featureCodecHeader.getHeaderValue();
-                headerValue.addMetaDataLine(new VCFFilterHeaderLine("PASS", "All filters passed"));
                 headers.put(source.getStudyId(), headerValue);
             } else {
                 throw new IllegalArgumentException("File headers not available for study " + source.getStudyId());
@@ -127,188 +179,17 @@ public class VariantExporter {
         }
 
         return headers;
-        //TODO: allow specify which samples to return
-/*
-//
-//        header.addMetaDataLine(new VCFFilterHeaderLine(".", "No FILTER info"));
+    }
 
-//        List<String> returnedSamples = new ArrayList<>();
-//        if (options != null) {
-//            returnedSamples = options.getAsStringList(VariantDBAdaptor.VariantQueryParams.RETURNED_SAMPLES.key());
-//        }
-        int lastLineIndex = fileHeader.lastIndexOf("#CHROM");
-        if (lastLineIndex >= 0) {
-            String substring = fileHeader.substring(0, lastLineIndex);
-            if (returnedSamples.isEmpty()) {
-                BiMap<Integer, String> samplesPosition = StudyConfiguration.getSamplesPosition(studyConfiguration).inverse();
-                returnedSamples = new ArrayList<>(samplesPosition.size());
-                for (int i = 0; i < samplesPosition.size(); i++) {
-                    returnedSamples.add(samplesPosition.get(i));
-                }
-            }
-            String samples = String.join("\t", returnedSamples);
-            logger.debug("export will be done on samples: [{}]", samples);
+    public VCFHeader getMergedVCFHeader(Map<String, VariantSource> sources) throws IOException {
+        Map<String, VCFHeader> headers = getVcfHeaders(sources);
 
-            fileHeader = substring + "#CHROM\tPOS\tID\tREF\tALT\tQUAL\tFILTER\tINFO\tFORMAT\t" + samples;
-        }
-//        return VariantFileMetadataToVCFHeaderConverter.parseVcfHeader(fileHeader);
-
-        // */
-
+        Set<VCFHeaderLine> mergedHeaderLines = VCFUtils.smartMergeHeaders(headers.values(), true);
+        VCFHeader header = new VCFHeader(mergedHeaderLines, outputSampleNames);
+        return header;
     }
 
     public int getFailedVariants() {
         return failedVariants;
     }
-
-    /**
-     * converts org.opencb.biodata.models.variant.Variant into one or more htsjdk.variant.variantcontext.VariantContext
-     * behaviour:
-     * * one VariantContext per study
-     * * split multiallelic variant will remain split.
-     * * in case a normalized INDEL has empty alleles, a query to cellbase will be done, to have the previous base as context
-     *
-     * steps:
-     * * foreach variantSourceEntry, collect genotypes in its study, only if the study was requested
-     * * get main variant data: position, alleles, filter...
-     * * if there are empty alleles, get them from cellbase
-     * * get the genotypes
-     * * add all (position, alleles, genotypes...) to a VariantContext for each study.
-     *
-     * @param variant
-     * @return
-     */
-    public Map<String, VariantContext> convertBiodataVariantToVariantContext(
-            Variant variant, List<String> studyIds, Region region) throws IOException {
-        int missingGenotypes = 0;
-        Map<String, VariantContext> variantContextMap = new TreeMap<>();
-        VariantContextBuilder variantContextBuilder = new VariantContextBuilder();
-
-        String reference = variant.getReference();
-        String alternate = variant.getAlternate();
-        Integer start = variant.getStart();
-        Integer end = start + reference.length() -1;
-        String filter = "PASS";
-        String[] allelesArray = {reference, alternate};
-        Map<String, List<Genotype>> genotypesPerStudy = new TreeMap<>();
-
-        for (VariantSourceEntry source : variant.getSourceEntries().values()) {
-
-            String studyId = source.getStudyId();
-
-            if (studyIds.contains(studyId)) {   // skipping studies not asked
-
-                // if we added this outside the loop, if the study is not present in this variant, the writer would add
-                // a whole line of "./."
-                if (!genotypesPerStudy.containsKey(studyId)) {
-                    genotypesPerStudy.put(studyId, new ArrayList<Genotype>());
-                }
-
-                // if there are indels, we cannot use the normalized alleles, (hts forbids empty alleles) so we have to take them from cellbase
-                boolean emptyAlleles = false;
-                for (String a : allelesArray) {
-                    if (a.isEmpty()) {
-                        emptyAlleles = true;
-                        break;
-                    }
-                }
-
-                if (emptyAlleles) {
-                    // TODO: the context nucleotide is being retrieved several times for the same variant
-                    // TODO: study this loop, extracting all common code to avoid being executed more than once if not necessary
-                    // TODO: to be fixed in the merge studies feature
-                    String contextNucleotide;
-                    if (region != null) {
-                        contextNucleotide = getContextNucleotideFromCellbaseCachingRegions(variant, start, region, studyId);
-                    } else {
-                        contextNucleotide = getContextNucleotideFromCellbase(variant, start, studyId);
-                    }
-                    // TODO: maybe this can be more efficient
-                    allelesArray[0] = contextNucleotide + reference;
-                    allelesArray[1] =  contextNucleotide + alternate;
-                    end = start + allelesArray[0].length() - 1;
-                }
-
-                // add the genotypes
-                for (Map.Entry<String, Map<String, String>> samplesData : source.getSamplesData().entrySet()) {
-                    // reminder of samplesData meaning: Map(sampleName -> Map(dataType -> value))
-                    String sampleName = samplesData.getKey();
-                    String gt = samplesData.getValue().get("GT");
-
-                    if (gt != null) {
-                        org.opencb.biodata.models.feature.Genotype genotype = new org.opencb.biodata.models.feature.Genotype(gt, reference, alternate);
-                        List<Allele> alleles = new ArrayList<>();
-                        for (int gtIdx : genotype.getAllelesIdx()) {
-                            if (gtIdx < allelesArray.length && gtIdx >= 0) {
-                                alleles.add(Allele.create(allelesArray[gtIdx], gtIdx == 0));    // allele is reference if the alleleIndex is 0
-                            } else {
-                                alleles.add(Allele.create(".", false)); // genotype of a secondary alternate, or an actual missing
-                            }
-                        }
-                        genotypesPerStudy.get(studyId).add(
-                                new GenotypeBuilder().name(sampleName).alleles(alleles).phased(genotype.isPhased()).make());
-                    } else {
-                        missingGenotypes++;
-                    }
-                }
-            }
-        }
-
-        if (missingGenotypes > 0) {
-            logger.info("Variant %s:%d:%s>%s lacked the GT field in %d genotypes (they will be printed as \"./.\").",
-                    variant.getChromosome(), variant.getStart(), variant.getReference(), variant.getAlternate());
-        }
-
-        for (Map.Entry<String, List<Genotype>> studyEntry : genotypesPerStudy.entrySet()) {
-            VariantContext make = variantContextBuilder
-                    .chr(variant.getChromosome())
-                    .start(start)
-                    .stop(end)
-//                .id(String.join(";", variant.getIds()))   // in multiallelic, this results in duplicated ids, across several rows
-                    .noID()
-                    .alleles(allelesArray)
-                    .filter(filter)
-                    .genotypes(studyEntry.getValue()).make();
-            variantContextMap.put(studyEntry.getKey(), make);
-        }
-        return variantContextMap;
-    }
-
-    private String getContextNucleotideFromCellbase(Variant variant, Integer start, String studyId) throws IOException {
-        if (cellbaseClient != null) {
-            return cellbaseClient.getSequence(new Region(variant.getChromosome(), start - 1, start-1));
-        } else {
-            throw new IllegalArgumentException(String.format(
-                    "CellBase was not provided, needed to fill empty alleles at study %s, in variant %s:%d:%s>%s", studyId,
-                    variant.getChromosome(), variant.getStart(), variant.getReference(), variant.getAlternate()));
-        }
-    }
-
-    private String getContextNucleotideFromCellbaseCachingRegions(Variant variant, int start, Region region, String studyId) throws IOException {
-        if (cellbaseClient != null) {
-            try {
-                if (regionSequence == null) {
-                    // if an indel start is the first nucleotide of the region, we will need the previous nucleotide, so we are adding
-                    // the preceding nucleotide to the region (region.getStart()-1)
-                    regionSequence = cellbaseClient.getSequence(new Region(variant.getChromosome(), region.getStart()-1, region.getEnd()));
-                }
-                String nucleotide = getNucleotideFromRegionSequence(start, region.getStart(), regionSequence);
-                return nucleotide;
-            } catch (Exception e) {
-                logger.error("Getting nucleotide for variant {} in region {} using start {}: {}", variant, region, start, e.getMessage());
-                throw e;
-            }
-        } else {
-            throw new IllegalArgumentException(String.format(
-                    "CellBase was not provided, needed to fill empty alleles at study %s, in variant %s:%d:%s>%s", studyId,
-                    variant.getChromosome(), variant.getStart(), variant.getReference(), variant.getAlternate()));
-        }
-    }
-
-    private String getNucleotideFromRegionSequence(int start, int regionStart, String regionSequence) {
-        int relativePosition = start - regionStart;
-        return regionSequence.substring(relativePosition, relativePosition + 1);
-    }
-
-
 }

@@ -20,9 +20,7 @@ import htsjdk.variant.variantcontext.VariantContext;
 import htsjdk.variant.vcf.VCFFileReader;
 import org.junit.AfterClass;
 import org.junit.BeforeClass;
-import org.junit.Rule;
 import org.junit.Test;
-import org.junit.rules.ExpectedException;
 import org.opencb.biodata.models.variant.Variant;
 import org.opencb.datastore.core.QueryOptions;
 import org.opencb.opencga.lib.common.Config;
@@ -31,7 +29,6 @@ import org.opencb.opencga.storage.core.StorageManagerFactory;
 import org.opencb.opencga.storage.core.variant.VariantStorageManager;
 import org.opencb.opencga.storage.core.variant.adaptors.VariantDBAdaptor;
 import org.opencb.opencga.storage.core.variant.adaptors.VariantDBIterator;
-import org.opencb.opencga.storage.core.variant.adaptors.VariantSourceDBAdaptor;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -50,18 +47,16 @@ import static org.junit.Assert.*;
  */
 public class VariantExporterControllerTest {
 
-//    @Rule
-//    public ExpectedException thrown = ExpectedException.none();
-
     private static final String DB_NAME = "VariantExporterTest";
     public static final String OUTPUT_DIR = "/tmp/";
 
     private static CellbaseWSClient cellBaseClient;
     private static VariantStorageManager variantStorageManager;
     private static VariantDBAdaptor variantDBAdaptor;
-//    private static VariantSourceDBAdaptor variantSourceDBAdaptor;
+    private static VariantDBAdaptor cowVariantDBAdaptor;
     private static final Logger logger = LoggerFactory.getLogger(VariantExporterControllerTest.class);
     private static final MultivaluedMap<String, String> emptyFilter = new MultivaluedHashMap<>();
+    private static List<String> testOutputFiles;
 
 
     @BeforeClass
@@ -74,7 +69,8 @@ public class VariantExporterControllerTest {
         logger.info("Using cellbase: " + cellBaseClient.getUrl() + " version " + cellBaseClient.getVersion());
         variantStorageManager = StorageManagerFactory.getVariantStorageManager();
         variantDBAdaptor = variantStorageManager.getDBAdaptor(DB_NAME, null);
-//        variantSourceDBAdaptor = variantDBAdaptor.getVariantSourceDBAdaptor();
+        cowVariantDBAdaptor = variantStorageManager.getDBAdaptor(VariantExporterTestDB.COW_TEST_DB_NAME, null);
+        testOutputFiles = new ArrayList<>();
     }
 
     /**
@@ -85,6 +81,7 @@ public class VariantExporterControllerTest {
     @AfterClass
     public static void tearDownClass() throws UnknownHostException {
         VariantExporterTestDB.cleanDBs();
+        testOutputFiles.forEach(f -> new File(f).delete());
     }
 
     @Test
@@ -144,78 +141,83 @@ public class VariantExporterControllerTest {
 
     @Test
     public void testVcfHtsExportOneStudy() throws ClassNotFoundException, StorageManagerException, URISyntaxException, InstantiationException, IllegalAccessException, IOException {
-        String studyId = "7";
+        String studyId = "PRJEB6119";
         List<String> studies = Collections.singletonList(studyId);
 
-        // TODO: remove files filter from Exporter
-        // TODO: another test with query parameters
-        // TODO: what is being used for species name?
-        VariantExporterController controller = new VariantExporterController("hsapiens", DB_NAME, studies, null, OUTPUT_DIR, emptyFilter);
+        VariantExporterController controller = new VariantExporterController("btaurus", VariantExporterTestDB.COW_TEST_DB_NAME, studies, OUTPUT_DIR, emptyFilter);
         controller.run();
 
         ////////// checks
-        Map<String, String> outputFiles = controller.getOuputFiles();
-        assertEquals(studies.size(), outputFiles.size());
+        String outputFile = controller.getOuputFilePath();
+        testOutputFiles.add(outputFile);
         assertEquals(0, controller.getFailedVariants());   // test file should not have failed variants
         QueryOptions query = getQuery(studies);
-        VariantDBIterator iterator = variantDBAdaptor.iterator(query);
-        assertEqualLinesFilesAndDB(outputFiles.get(studyId), iterator);
-
-        checkOrderInOutputFiles(outputFiles);
+        VariantDBIterator iterator = cowVariantDBAdaptor.iterator(query);
+        assertEqualLinesFilesAndDB(outputFile, iterator);
+        checkOrderInOutputFile(outputFile);
     }
 
     @Test
     public void testVcfHtsExportSeveralStudies() throws Exception {
-        String study7 = "7";
-        String study8 = "8";
-        List<String> studies = Arrays.asList(study7, study8);
+        String study6119 = "PRJEB6119";
+        String study7061 = "PRJEB7061";
+        List<String> studies = Arrays.asList(study6119, study7061);
 
-        VariantExporterController controller = new VariantExporterController("hsapiens", DB_NAME, studies, null, OUTPUT_DIR, emptyFilter);
+        VariantExporterController controller = new VariantExporterController("btaurus", VariantExporterTestDB.COW_TEST_DB_NAME, studies, OUTPUT_DIR, emptyFilter);
         controller.run();
 
         ////////// checks
-        Map<String, String> outputFiles = controller.getOuputFiles();
-        assertEquals(studies.size(), outputFiles.size());
+        String outputFile = controller.getOuputFilePath();
+        testOutputFiles.add(outputFile);
         assertEquals(0, controller.getFailedVariants());   // test file should not have failed variants
-
-        // for study 7
-        QueryOptions query = getQuery(Collections.singletonList(study7));
-        VariantDBIterator iterator = variantDBAdaptor.iterator(query);
-        assertEqualLinesFilesAndDB(outputFiles.get(study7), iterator);
-
-        // for study 8
-        query = getQuery(Collections.singletonList(study8));
-        iterator = variantDBAdaptor.iterator(query);
-        assertEqualLinesFilesAndDB(outputFiles.get(study8), iterator);
-
-        checkOrderInOutputFiles(outputFiles);
+        QueryOptions query = getQuery(Arrays.asList(study6119, study7061));
+        VariantDBIterator iterator = cowVariantDBAdaptor.iterator(query);
+        assertEqualLinesFilesAndDB(outputFile, iterator);
+        checkOrderInOutputFile(outputFile);
     }
 
     @Test
-    public void testFilter() throws Exception {
+    public void testConsequenceTypeFilter() throws Exception {
         String studyId = "7";
         List<String> studies = Collections.singletonList(studyId);
 
-        // TODO: use a different filter that can be set from the variant browser
         MultivaluedMap<String, String> filter = new MultivaluedHashMap<>();
-        filter.putSingle(VariantDBAdaptor.REGION, "20:61000-69000");
-        filter.putSingle(VariantDBAdaptor.REFERENCE, "A");
-        VariantExporterController controller = new VariantExporterController("hsapiens", DB_NAME, studies, null, OUTPUT_DIR, filter);
+        filter.putSingle(VariantDBAdaptor.ANNOT_CONSEQUENCE_TYPE, "1627");
+        VariantExporterController controller = new VariantExporterController("hsapiens", DB_NAME, studies, OUTPUT_DIR, filter);
         controller.run();
 
         ////////// checks
-        Map<String, String> outputFiles = controller.getOuputFiles();
-        assertEquals(studies.size(), outputFiles.size());
+        String outputFile = controller.getOuputFilePath();
+        testOutputFiles.add(outputFile);
         assertEquals(0, controller.getFailedVariants());   // test file should not have failed variants
-
-        QueryOptions query = getQuery(studies);
-        query.put(VariantDBAdaptor.REGION, "20:61000-69000");
-        query.put(VariantDBAdaptor.REFERENCE, "A");
+        QueryOptions query = controller.getQuery(filter);
         VariantDBIterator iterator = variantDBAdaptor.iterator(query);
-        assertEqualLinesFilesAndDB(outputFiles.get(studyId), iterator);
-
-        checkOrderInOutputFiles(outputFiles);
+        assertEqualLinesFilesAndDB(outputFile, iterator);
+        checkOrderInOutputFile(outputFile);
     }
+
+    @Test
+    public void testConsequenceTypeAndRegionFilter() throws Exception {
+        String studyId = "7";
+        List<String> studies = Collections.singletonList(studyId);
+
+        MultivaluedMap<String, String> filter = new MultivaluedHashMap<>();
+        filter.putSingle(VariantDBAdaptor.REGION, "20:60000-61000");
+        filter.putSingle(VariantDBAdaptor.ANNOT_CONSEQUENCE_TYPE, "1627");
+        VariantExporterController controller = new VariantExporterController("hsapiens", DB_NAME, studies, OUTPUT_DIR, filter);
+        controller.run();
+
+        ////////// checks
+        String outputFile = controller.getOuputFilePath();
+        testOutputFiles.add(outputFile);
+        assertEquals(0, controller.getFailedVariants());   // test file should not have failed variants
+        QueryOptions query = controller.getQuery(filter);
+        VariantDBIterator iterator = variantDBAdaptor.iterator(query);
+        assertEqualLinesFilesAndDB(outputFile, iterator);
+        checkOrderInOutputFile(outputFile);
+    }
+
+
 
     @Test
     public void testFilterUsingIntersectingRegions() throws Exception {
@@ -226,37 +228,35 @@ public class VariantExporterControllerTest {
         MultivaluedMap<String, String> filter = new MultivaluedHashMap<>();
         filter.put(VariantDBAdaptor.REGION, Arrays.asList("20:61000-66000", "20:63000-69000"));
 
-        VariantExporterController controller = new VariantExporterController("hsapiens", DB_NAME, studies, null, OUTPUT_DIR, filter);
+        VariantExporterController controller = new VariantExporterController("hsapiens", DB_NAME, studies, OUTPUT_DIR, filter);
         controller.run();
 
         ////////// checks
-        Map<String, String> outputFiles = controller.getOuputFiles();
-        assertEquals(studies.size(), outputFiles.size());
+        String outputFile = controller.getOuputFilePath();
+        testOutputFiles.add(outputFile);
         assertEquals(0, controller.getFailedVariants());   // test file should not have failed variants
 
         QueryOptions query = getQuery(studies);
         query.put(VariantDBAdaptor.REGION, String.join(",", filter.get(VariantDBAdaptor.REGION)));
         VariantDBIterator iterator = variantDBAdaptor.iterator(query);
 
-        assertEqualLinesFilesAndDB(outputFiles.get(studyId), iterator);
+        assertEqualLinesFilesAndDB(outputFile, iterator);
 
-        checkOrderInOutputFiles(outputFiles);
+        checkOrderInOutputFile(outputFile);
     }
 
-    private void checkOrderInOutputFiles(Map<String, String> outputFiles) {
-        for (String outputFile : outputFiles.values()) {
-            assertVcfOrderedByCoordinate(outputFile);
-            this.logger.info("Deleting output temp file {}", outputFile);
-            boolean delete = new File(outputFile).delete();
-            assertTrue(delete);
-        }
+    private void checkOrderInOutputFile(String outputFile) {
+        assertVcfOrderedByCoordinate(outputFile);
+        this.logger.info("Deleting output temp file {}", outputFile);
+        boolean delete = new File(outputFile).delete();
+        assertTrue(delete);
     }
 
     @Test(expected = IllegalArgumentException.class)
     public void testMissingStudy() throws Exception {
         List<String> studies = Arrays.asList("7", "9"); // study 9 doesn't exist
 
-        VariantExporterController controller = new VariantExporterController("hsapiens", DB_NAME, studies, null, OUTPUT_DIR, emptyFilter);
+        VariantExporterController controller = new VariantExporterController("hsapiens", DB_NAME, studies, OUTPUT_DIR, emptyFilter);
 
         controller.run();
     }
@@ -264,24 +264,24 @@ public class VariantExporterControllerTest {
     @Test(expected = IllegalArgumentException.class)
     public void nullSpeciesThrowsIllegalArgumentException() throws Exception {
         List<String> studies = Collections.singletonList("8");
-        new VariantExporterController(null, DB_NAME, studies, null, OUTPUT_DIR, emptyFilter);
+        new VariantExporterController(null, DB_NAME, studies, OUTPUT_DIR, emptyFilter);
     }
 
     @Test(expected = IllegalArgumentException.class)
     public void nullDbnameThrowsIllegalArgumentException() throws Exception {
         List<String> studies = Collections.singletonList("8");
-        new VariantExporterController("hsapiens", null, studies, null, OUTPUT_DIR, emptyFilter);
+        new VariantExporterController("hsapiens", null, studies, OUTPUT_DIR, emptyFilter);
     }
 
     @Test(expected = IllegalArgumentException.class)
     public void emtpyStudiesThrowsIllegalArgumentException() throws Exception {
-        new VariantExporterController("hsapiens", DB_NAME, Collections.EMPTY_LIST, null, OUTPUT_DIR, emptyFilter);
+        new VariantExporterController("hsapiens", DB_NAME, Collections.EMPTY_LIST, OUTPUT_DIR, emptyFilter);
     }
 
     @Test(expected = IllegalArgumentException.class)
     public void nullOutputDirThrowsIllegalArgumentException() throws Exception {
         List<String> studies = Collections.singletonList("8");
-        new VariantExporterController("hsapiens", DB_NAME, studies, null, null, emptyFilter);
+        new VariantExporterController("hsapiens", DB_NAME, studies, null, emptyFilter);
     }
 
     private void assertEqualLinesFilesAndDB(String fileName, VariantDBIterator iterator) throws IOException {
@@ -321,7 +321,6 @@ public class VariantExporterControllerTest {
     }
 
     private void assertVcfOrderedByCoordinate(String fileName) {
-        // TODO: implement
         logger.info("Checking that {} is sorted by coordinate", fileName);
         Set<String> finishedContigs = new HashSet<>();
         VCFFileReader vcfReader = new VCFFileReader(new File(fileName), false);
@@ -338,7 +337,9 @@ public class VariantExporterControllerTest {
                 assertFalse("The variants should by grouped by contig in the vcf output", finishedContigs.contains(lastContig));
                 previousStart = -1;
             }
-            assertTrue("The vcf is not sorted by coordinate: " + variant, variant.getStart() >= previousStart);
+            assertTrue("The vcf is not sorted by coordinate: " + variant.getContig() + ":" + variant.getStart() + ":" +
+                    variant.getReference() + "->" + variant.getAlternateAlleles() + "; Previous variant start: " + previousStart,
+                    variant.getStart() >= previousStart);
             previousStart = variant.getStart();
         }
 
