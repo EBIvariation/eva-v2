@@ -42,6 +42,9 @@ public class CommonConfig {
         properties.put("calculateStats", "false");
         properties.put("outputDir", "/tmp");
         properties.put("dbName", "");
+        properties.put("dbCollectionVariantsName", "variants");
+        properties.put("dbCollectionFilesName", "files");
+        properties.put("readPreference", "primary");
         properties.put("compressExtension", ".gz");
         properties.put("compressGenotypes", "true");
         properties.put("includeSrc", "FIRST_8_COLUMNS");
@@ -58,9 +61,7 @@ public class CommonConfig {
         properties.put(VariantsLoad.SKIP_LOAD, "true");
         properties.put(VariantsStatsCreate.SKIP_STATS_CREATE, "true");
         properties.put(VariantsStatsLoad.SKIP_STATS_LOAD, "true");
-        properties.put(VariantsAnnotGenerateInput.SKIP_ANNOT_GENERATE_INPUT, "true");
         properties.put(VariantsAnnotCreate.SKIP_ANNOT_CREATE, "true");
-        properties.put(VariantsAnnotLoad.SKIP_ANNOT_LOAD, "true");
         properties.put("vepInput", "");
         properties.put("vepOutput", "");
         properties.put("vepPath", "");

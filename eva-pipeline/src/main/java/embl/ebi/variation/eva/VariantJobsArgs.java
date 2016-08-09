@@ -36,6 +36,7 @@ import java.nio.file.Paths;
  * @author Diego Poggioli &lt;diego@ebi.ac.uk&gt;
  *
  * TODO: 20/05/2016 add type/null/file/dir validators
+ * TODO validation checks for all the parameters
  */
 @Component
 public class VariantJobsArgs {
@@ -50,7 +51,6 @@ public class VariantJobsArgs {
     @Value("${studyType}") private String studyType;
     @Value("${studyName}") private String studyName;
     @Value("${studyId}") private String studyId;
-    @Value("${dbName}") private String dbName;
     @Value("${compressGenotypes}") private String compressGenotypes;
     @Value("${overwriteStats:false}") private boolean overwriteStats;
     @Value("${calculateStats:false}") private boolean calculateStats;
@@ -60,8 +60,17 @@ public class VariantJobsArgs {
     @Value("${includeStats:false}")private String includeStats;
     @Value("${aggregated}") private String aggregated;
 
-
     @Value("${opencga.app.home}") private String opencgaAppHome;
+
+    /// DB connection
+    @Value("${dbHosts:}") private String dbHosts;
+    @Value("${dbAuthenticationDb:}") private String dbAuthenticationDb;
+    @Value("${dbUser:}") private String dbUser;
+    @Value("${dbPassword:}") private String dbPassword;
+    @Value("${dbName}") private String dbName;
+    @Value("${dbCollectionVariantsName}") private String dbCollectionVariantsName;
+    @Value("${dbCollectionFilesName}") private String dbCollectionFilesName;
+    @Value("${readPreference}") private String readPreference;
 
     ////pipeline
     @Value("${outputDir}") private String outputDir;
@@ -71,9 +80,7 @@ public class VariantJobsArgs {
     @Value("${skipLoad:false}") private boolean skipLoad;
     @Value("${skipStatsCreate:false}") private boolean skipStatsCreate;
     @Value("${skipStatsLoad:false}") private boolean skipStatsLoad;
-    @Value("${skipAnnotGenerateInput:false}") private boolean skipAnnotGenerateInput;
     @Value("${skipAnnotCreate:false}") private boolean skipAnnotCreate;
-    @Value("${skipAnnotLoad:false}") private boolean skipAnnotLoad;
 
     //VEP
     @Value("${vepInput}") private String vepInput;
@@ -93,7 +100,7 @@ public class VariantJobsArgs {
     public void loadArgs() {
         logger.info("Load args");
 
-        // TODO validation checks for all the parameters
+
         Config.setOpenCGAHome(opencgaAppHome);
 
         loadVariantOptions();
@@ -131,12 +138,18 @@ public class VariantJobsArgs {
         pipelineOptions.put("compressExtension", compressExtension);
         pipelineOptions.put("outputDir", outputDir);
         pipelineOptions.put("pedigree", pedigree);
+        pipelineOptions.put("dbHosts", dbHosts);
+        pipelineOptions.put("dbAuthenticationDb", dbAuthenticationDb);
+        pipelineOptions.put(VariantStorageManager.DB_NAME, dbName);
+        pipelineOptions.put("dbCollectionVariantsName", dbCollectionVariantsName);
+        pipelineOptions.put("dbCollectionFilesName", dbCollectionFilesName);
+        pipelineOptions.put("dbUser", dbUser);
+        pipelineOptions.put("dbPassword", dbPassword);
+        pipelineOptions.put("readPreference", readPreference);
         pipelineOptions.put(VariantsLoad.SKIP_LOAD, skipLoad);
         pipelineOptions.put(VariantsStatsCreate.SKIP_STATS_CREATE, skipStatsCreate);
         pipelineOptions.put(VariantsStatsLoad.SKIP_STATS_LOAD, skipStatsLoad);
-        pipelineOptions.put(VariantsAnnotGenerateInput.SKIP_ANNOT_GENERATE_INPUT, skipAnnotGenerateInput);
         pipelineOptions.put(VariantsAnnotCreate.SKIP_ANNOT_CREATE, skipAnnotCreate);
-        pipelineOptions.put(VariantsAnnotLoad.SKIP_ANNOT_LOAD, skipAnnotLoad);
         pipelineOptions.put("vepInput", vepInput);
         pipelineOptions.put("vepOutput", vepOutput);
         pipelineOptions.put("vepPath", vepPath);
